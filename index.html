@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>King of Europe</title>
+  <link rel="stylesheet" href="web/src/style.css" />
+  <script>
+    // Set the theme before first paint to avoid a flash. A stored choice always wins; with no
+    // stored choice we DEFAULT TO DARK (the preferred look), regardless of OS setting.
+    (function () {
+      try {
+        var saved = localStorage.getItem("koe-theme");
+        var dark = saved ? saved === "dark" : true;
+        document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <div id="onboarding" class="onboarding hidden"></div>
+  <header class="topbar">
+    <div class="topbar-side">
+      <div class="logo">
+        <div class="logo-type">
+          <span class="line1">
+            <span class="kwrap">
+              <svg class="crown" viewBox="0 0 40 26" aria-hidden="true">
+                <path d="M2 24 L6 6 L14 15 L20 2 L26 15 L34 6 L38 24 Z" />
+                <circle cx="6" cy="4" r="2.6" /><circle cx="20" cy="1.5" r="3" /><circle cx="34" cy="4" r="2.6" />
+              </svg>
+              <span class="k">K</span></span>ing <span class="of">of</span>
+          </span>
+          <span class="line2">Europe</span>
+        </div>
+        <svg class="ball" viewBox="0 0 100 100" aria-hidden="true">
+          <circle class="ball-body" cx="50" cy="50" r="46" />
+          <g class="ball-lines">
+            <circle cx="50" cy="50" r="46" />
+            <path d="M50 4 V96" /><path d="M4 50 H96" />
+            <path d="M14 18 Q50 50 14 82" /><path d="M86 18 Q50 50 86 82" />
+          </g>
+        </svg>
+      </div>
+    </div>
+    <div class="topbar-side">
+      <div class="modes" id="modes">
+        <button class="mode-tab on" data-mode="classic" type="button">Classic</button>
+        <button class="mode-tab" data-mode="daily" type="button">Daily</button>
+        <button class="mode-tab" data-mode="versus" type="button">Versus</button>
+        <button class="mode-tab" data-mode="salary" type="button">Salary</button>
+      </div>
+      <button id="help-btn" class="corner-btn help-btn" type="button" title="How to play" aria-label="How to play">?</button>
+      <button id="theme-toggle" class="corner-btn theme-toggle" type="button"
+              title="Toggle light / dark" aria-label="Toggle light or dark mode">
+        <span class="moon" aria-hidden="true">🌙</span><span class="sun" aria-hidden="true">☀️</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="app">
+    <div class="daily-bar hidden" id="daily-bar"></div>
+
+    <div class="control">
+      <div class="pickinfo" id="pickinfo">Pick 1 of 5</div>
+      <div class="spin-group">
+        <button id="spin-btn" class="spin-btn">Spin</button>
+        <span class="respins" title="One of each, per playthrough">
+          <button id="spin-club-btn" class="mini-btn" title="Re-spin the club, keep the year">↻ Club</button>
+          <button id="spin-year-btn" class="mini-btn" title="Re-spin the year, keep the club">↻ Year</button>
+          <button id="spin-both-btn" class="mini-btn" title="Re-spin both club and year">↻ Both</button>
+        </span>
+      </div>
+      <button id="reset-btn" class="ghost-btn hidden">Start over</button>
+    </div>
+
+    <div class="layout">
+      <!-- LEFT: players while drafting, then ONLY the record + bracket -->
+      <section class="roster-panel">
+        <div id="offer" class="offer">
+          <p class="empty-hint">Press <b>Spin</b> to draw a club and year, then choose a player.</p>
+        </div>
+        <div id="commit" class="commit hidden"></div>
+        <div id="result-card" class="result-card hidden"></div>
+      </section>
+
+      <!-- RIGHT: arena above the court, court, coach on the sideline, balance -->
+      <aside class="sidebar">
+        <div id="venue" class="venue"></div>
+
+        <div class="court-wrap" id="court-wrap">
+          <svg class="court" viewBox="0 0 300 320" aria-hidden="true">
+            <rect class="c-floor" x="6" y="6" width="288" height="308" rx="6" />
+            <rect class="c-paint" id="c-paint" x="110" y="6" width="80" height="122" />
+            <text class="c-mark" id="c-mark" x="150" y="205" text-anchor="middle" dominant-baseline="middle"></text>
+            <rect class="c-line" x="110" y="6" width="80" height="122" fill="none" />
+            <path class="c-line" d="M45,6 L45,66 A112,112 0 0 0 255,66 L255,6" fill="none" />
+            <circle class="c-line" cx="150" cy="128" r="34" fill="none" />
+            <line class="c-line" x1="131" y1="22" x2="169" y2="22" />
+            <circle class="c-line" cx="150" cy="30" r="7" fill="none" />
+            <path class="c-line" d="M6,300 A150,150 0 0 0 294,300" fill="none" />
+          </svg>
+          <div class="court-sweep" id="court-sweep"></div>
+          <div id="court-spots"></div>
+        </div>
+        <div id="sixth-slot" class="sixth-slot"></div>
+        <p class="place-hint" id="place-hint"></p>
+
+        <div id="bench" class="bench"></div>
+
+        <div id="sidebar-cats">
+          <h2>Category balance</h2>
+          <div id="cat-bars"></div>
+          <p class="gate-note" id="gate-note"></p>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="footnote">
+    Player names and statistics are facts, used here for a game. No club crests, logos, or
+    photographs. <strong>Not affiliated with EuroLeague Basketball.</strong>
+  </footer>
+
+  <script>
+    // Toggle + persist. The pre-paint script above set the initial theme.
+    document.getElementById("theme-toggle").addEventListener("click", function () {
+      var root = document.documentElement;
+      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("koe-theme", next); } catch (e) {}
+    });
+  </script>
+  <script type="module" src="web/src/app.js"></script>
+</body>
+</html>

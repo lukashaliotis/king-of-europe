@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Cloudflare Wrangler local state / secrets
+.wrangler/
+.dev.vars
+wrangler.local.toml
+
+# Pipeline raw API cache (~23 MB, regenerable — the baked data/players.json is what ships)
+pipeline/cache/
+
+# OS / editor cruft
+.DS_Store
+*.swp

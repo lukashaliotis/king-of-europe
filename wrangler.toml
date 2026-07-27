@@ -1,0 +1,13 @@
+# Cloudflare Pages + Functions + D1 config for King of Europe.
+# The static site is the repo root; the serverless leaderboard lives in /functions.
+name = "king-of-europe"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = "."
+
+# The Daily leaderboard database. Create it once with:
+#   wrangler d1 create koe-leaderboard
+# then paste the printed database_id below (replace PASTE_DATABASE_ID_HERE).
+[[d1_databases]]
+binding = "DB"
+database_name = "koe-leaderboard"
+database_id = "PASTE_DATABASE_ID_HERE"
