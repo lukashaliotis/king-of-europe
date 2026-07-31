@@ -191,4 +191,16 @@ convert `arenaFlames`/`arenaSVG` thresholds accordingly (impact stays identical)
   atmosphere-tuned ratings (research-backed: Zvezda ↑, Beşiktaş/SAP Garden ↑, Monaco/Zenit ↓, London
   kept as a −0.4 "meme"). `web/src/arenas.js`.
 - **Onboarding:** trimmed 5 → 4 slides; intro now mentions the EuroLeague trophy.
-- **Coach:** Ivković → Legendary.
+- **Coach:** Ivković → Legendary (rest of the coach batch still open — see §3).
+- **Team data:** dead `MCT` removed; **KK Zadar** added (MIN_ROSTER 6→5 in `data.js`, since you pick
+  one player per spin; blue/white in `clubs.js`).
+- **Spin variety:** weighting flattened **linear → √(top-5 strength)** (`data.js`) — elite clubs' spin
+  share roughly halved, ~70 more club-years in regular rotation.
+- **Difficulty re-tune:** because the flatter spin serves weaker club-years, the win curve was
+  recalibrated `leagueS 18→16.5, gameSteep 0.26→0.23` (`engine.js`) to hold median 25 / 38-0 ~2% /
+  p90 35 — **same difficulty, more variety.** (sim/retune2.mjs grid updated to the new locked pair.)
+
+## Still to do next
+- **Relative-gate category rebalance (§ item 4 from chat):** spreads the "weakest link" from 83% on
+  playmaking/efficiency to ~18–27% across four categories. Measured & promising; needs its OWN
+  difficulty re-tune (it also shifts the win distribution), so do it as the next isolated change.
