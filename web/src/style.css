@@ -369,7 +369,7 @@ h3 { font-size: 0.82rem; margin: 0 0 0.6rem; color: var(--muted); text-transform
 .cat-row { display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 0.45rem; margin-bottom: 0.25rem; }
 .cat-row .lbl { font-size: 0.72rem; color: var(--muted); text-transform: capitalize; }
 .cat-track { background: var(--bg-2); border-radius: 6px; height: 10px; position: relative; overflow: hidden; }
-.cat-fill { position: absolute; top: 0; bottom: 0; left: 50%; background: var(--accent); border-radius: 6px; transition: left 0.25s ease, width 0.25s ease; }
+.cat-fill { position: absolute; top: 0; bottom: 0; left: 50%; background: var(--accent); border-radius: 6px; transition: left 0.45s cubic-bezier(0.22, 1, 0.36, 1), width 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
 .cat-row.isgate .lbl { color: var(--gate); font-weight: 700; }
 .gate-note { font-size: 0.8rem; color: var(--gate); min-height: 1.2rem; margin: 0.5rem 0 0; }
 

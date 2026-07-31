@@ -1002,6 +1002,29 @@ function catBarsHTML(res) {
   }).join("");
 }
 
+// Update the drafting bars IN PLACE (don't rebuild the DOM), so the CSS transition animates each
+// change smoothly instead of snapping — the elements persist between picks and only their
+// width/position move.
+function updateCatBars(container, res) {
+  const gateCat = res ? res.gateCategory : null;
+  if (container.dataset.built !== "1") {
+    container.innerHTML = CATEGORIES.map((k) =>
+      `<div class="cat-row" data-cat="${k}"><span class="lbl">${k}</span>` +
+      `<div class="cat-track"><div class="cat-fill"></div></div></div>`).join("");
+    container.dataset.built = "1";
+  }
+  for (const k of CATEGORIES) {
+    const row = container.querySelector(`.cat-row[data-cat="${k}"]`);
+    const fill = row.querySelector(".cat-fill");
+    const score = res ? res.categoryScores[k] : 0;
+    const norm = score / (CAT_TYPICAL[k] * CAT_SPAN);
+    const pct = Math.min(50, Math.abs(norm) * 50);
+    fill.style.left = (norm >= 0 ? 50 : 50 - pct) + "%";
+    fill.style.width = pct + "%";
+    row.classList.toggle("isgate", k === gateCat);
+  }
+}
+
 function renderCats() {
   // On the final screen the balance lives inside the record card instead (see renderResult).
   const wrap = el("sidebar-cats");
@@ -1009,7 +1032,7 @@ function renderCats() {
   wrap.classList.remove("hidden");
   const picks = filled();
   const res = picks.length ? projectRecord(picks, state.data.seasons, undefined, 1, coachCatDeltas(), state.sixth) : null;
-  el("cat-bars").innerHTML = catBarsHTML(res);
+  updateCatBars(el("cat-bars"), res);
   el("gate-note").textContent = res && picks.length >= 2 ? `Weakest link: ${res.gateCategory}` : "";
 }
 
