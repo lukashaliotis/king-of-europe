@@ -200,7 +200,23 @@ convert `arenaFlames`/`arenaSVG` thresholds accordingly (impact stays identical)
   recalibrated `leagueS 18→16.5, gameSteep 0.26→0.23` (`engine.js`) to hold median 25 / 38-0 ~2% /
   p90 35 — **same difficulty, more variety.** (sim/retune2.mjs grid updated to the new locked pair.)
 
+- **Relative gate + 6th-man buff (DONE):** gate now judges each category vs its typical level
+  (`CAT_TYPICAL`/`GATE_SHIFT` in `engine.js`) → weakest link spread **reb 22% / playmaking 29% /
+  defense 21% / efficiency 20% / scoring 8%** (was 83% on playmaking+efficiency). 6th man buffed
+  `BENCH_MINUTES 0.55→0.80` (~+1.3→+1.8 wins). Re-tuned **leagueS 18, gameSteep 0.26→0.23** to hold
+  median 25 / 38-0 1.8% / p90 35 — same difficulty. `sim/category_diag.mjs`, `sim/retune2.mjs`.
+- **Share button (DONE):** every mode's result screen now has a copy-able share (Classic/Salary got
+  a generic one; Daily/Versus already had theirs); all shares now include the site link.
+
 ## Still to do next
-- **Relative-gate category rebalance (§ item 4 from chat):** spreads the "weakest link" from 83% on
-  playmaking/efficiency to ~18–27% across four categories. Measured & promising; needs its OWN
-  difficulty re-tune (it also shifts the win distribution), so do it as the next isolated change.
+- **Career-modal positions:** the roster API labels tweeners inconsistently (Othello Hunter = `F` at
+  Olympiacos but `C` at 6 other clubs → "only 1 center" bugs). Fix by assigning each player his
+  most-common position across seasons (runtime, no re-bake). No difficulty impact. See §7-adjacent.
+- **Coach batch:** populate the **Physical** tier (Trinchieri/Ivanović/Repeša/Pešić types — now
+  worthwhile since rebounding binds ~22%), the pending reclassifications (Jasikevičius/Trinchieri/
+  Pianigiani), and decide **dual-type** (§1). Ivković→Legendary already done.
+- **Scoring still binds least (8%):** greedy always grabs a scorer, so scoring rarely dips. Optional
+  deeper lever if we want "find a big scorer" to matter more: variance-normalize the gate (scale each
+  category by its spread, not just centre its mean).
+- **Championship rate:** measure the true title rate (with coach+arena+6th); if >~10%, toughen the
+  Final Four / Final opponents rather than the regular season.
