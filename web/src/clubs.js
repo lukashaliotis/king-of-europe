@@ -78,6 +78,7 @@ const CLUBS = {
   ORL: { c1: "#d32f2f", c2: "#0b3d91", ab: "ORL" }, // Orléans
   CHO: { c1: "#d32f2f", c2: "#ffffff", ab: "CHO" }, // Cholet
   ZAG: { c1: "#0033a0", c2: "#ffffff", ab: "ZAG" }, // KK Zagreb
+  ZAD: { c1: "#0b3d91", c2: "#ffffff", ab: "ZAD" }, // KK Zadar — blue & white
   BIL: { c1: "#111418", c2: "#d32f2f", ab: "BIL" }, // Bilbao Basket
   BES: { c1: "#111418", c2: "#ffffff", ab: "BES" }, // Beşiktaş
   CHL: { c1: "#d32f2f", c2: "#ffffff", ab: "CHL" }, // Élan Chalon

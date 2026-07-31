@@ -3,7 +3,7 @@
 // its roster, then spins again for the next slot. Five spins build the five.
 import { playerStrength, CATEGORIES } from "./engine.js";
 
-const MIN_ROSTER = 6; // a club-season needs a real roster to pick from
+const MIN_ROSTER = 5; // you pick ONE player per spin, so 5 gives a real choice (adds Zadar 2001)
 
 export async function loadData() {
   // Resolve relative to THIS module (web/src/data.js), not the page, so it works whether the
