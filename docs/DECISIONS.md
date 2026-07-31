@@ -84,12 +84,13 @@ Efficient≈System/Half-court maestro · Physical≈Bruiser/Glass-crashers · De
 
 From the coach review. Data probe (team box-score aggregates) shown in brackets:
 - **Ivković → Legendary** — **APPLIED** (`WAG` pedigree bumped to LEGEND in `coaches.js`).
-- **Jasikevičius** — leave Up-tempo, or → **Motion** (data: high ast-rate +0.43) / Balanced. *Open.*
+- **Jasikevičius → Motion** — **APPLIED** (`ADG` retagged; data ast-rate +0.43, Barça/Žalgiris identity).
 - **Trinchieri** — user floated Up-tempo; data says the opposite (tempo −0.75, reb −0.87 = grinding)
-  → recommend **keep Defensive**. *Open.*
-- **Pianigiani** — user floated Physical; data kills it (reb −0.49) → recommend **keep Up-tempo**.
-  *Open.*
-- **Saša Obradović / retire Physical** — see §2.2. *Open.*
+  → **kept Defensive** (APPLIED, comment annotated in `coaches.js`).
+- **Pianigiani** — user floated Physical; data kills it (reb −0.49) → **kept Up-tempo** (APPLIED).
+- **Physical tier populated** — **APPLIED**: Ivanović (`WAW`) + Pešić (`WCT`) moved Defensive→Physical,
+  joining Saša Obradović → 3 Physical coaches (Defensive still 9). Retiring Physical is now off the
+  table — with rebounding the gate ~22%, a rebounding-patch coach is wanted.
 
 ---
 
@@ -209,12 +210,14 @@ convert `arenaFlames`/`arenaSVG` thresholds accordingly (impact stays identical)
   a generic one; Daily/Versus already had theirs); all shares now include the site link.
 
 ## Still to do next
-- **Career-modal positions:** the roster API labels tweeners inconsistently (Othello Hunter = `F` at
-  Olympiacos but `C` at 6 other clubs → "only 1 center" bugs). Fix by assigning each player his
-  most-common position across seasons (runtime, no re-bake). No difficulty impact. See §7-adjacent.
-- **Coach batch:** populate the **Physical** tier (Trinchieri/Ivanović/Repeša/Pešić types — now
-  worthwhile since rebounding binds ~22%), the pending reclassifications (Jasikevičius/Trinchieri/
-  Pianigiani), and decide **dual-type** (§1). Ivković→Legendary already done.
+- **Career-modal positions — APPLIED.** Each player is now collapsed to ONE position for the whole
+  game: the one he played most (gp-weighted, ties → most-recent season), via `applyCareerPositions()`
+  in `data.js`, called inside `buildClubSeasons` so app + sim + server re-sim all agree. 279/5669 rows
+  changed; population dist barely moves (F 2202→2222, G 2311→2291, C unchanged). Hunter → C
+  everywhere; OLY 2015 gains a 2nd center, DYN 2006 a 2nd forward. Difficulty held (38-0 1.67%,
+  median 24, p90 35). Feeds position-relative z-scoring, so career centers are judged vs centers.
+- **Coach batch — APPLIED** (see §3). Physical tier populated (Ivanović + Pešić), Jasikevičius→Motion,
+  Trinchieri/Pianigiani kept per data. **Dual-type still DEFERRED** (§1) per user ("keep it as it is").
 - **Scoring still binds least (8%):** greedy always grabs a scorer, so scoring rarely dips. Optional
   deeper lever if we want "find a big scorer" to matter more: variance-normalize the gate (scale each
   category by its spread, not just centre its mean).

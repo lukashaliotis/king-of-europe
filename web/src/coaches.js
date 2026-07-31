@@ -40,13 +40,13 @@ export const ARCHETYPES = {
 // Keyed by the API's person code. Veto freely.
 const HAND_ARCHETYPES = {
   WBC: "defensive",  // Obradović, Željko
-  WAW: "defensive",  // Ivanović, Duško
+  WAW: "physical",   // Ivanović, Duško — brutal-conditioning, board-crashing grinder
   WAG: "defensive",  // Ivković, Dušan
   CAG: "defensive",  // Itoudis, Dimitris
   "001869": "defensive", // Bartzokas, Georgios
   KBM: "defensive",  // Sfairopoulos, Ioannis
-  WCT: "defensive",  // Pešić, Svetislav
-  CYP: "defensive",  // Trinchieri, Andrea
+  WCT: "physical",   // Pešić, Svetislav — old-school structured FIBA physicality
+  CYP: "defensive",  // Trinchieri, Andrea — data-confirmed grinder (tempo −0.75, reb −0.87)
   AEZ: "defensive",  // Radonjić, Dejan
   WBS: "defensive",  // Maljković, Božidar
   APU: "defensive",  // Zdovc, Jure
@@ -69,7 +69,7 @@ const HAND_ARCHETYPES = {
   BAS: "balanced",   // Pačėsas, Tomas
   WCL: "offensive",  // Ataman, Ergin
   BSS: "offensive",  // Laso, Pablo
-  ADG: "offensive",  // Jasikevičius, Šarūnas
+  ADG: "playmaker",  // Jasikevičius, Šarūnas — pass-heavy Barça/Žalgiris identity (ast-rate +0.43)
   WBB: "offensive",  // Blatt, David
   CAA: "offensive",  // Gershon, Pini
   "000733": "offensive", // Kurtinaitis, Rimas

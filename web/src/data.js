@@ -5,6 +5,40 @@ import { playerStrength, CATEGORIES } from "./engine.js";
 
 const MIN_ROSTER = 5; // you pick ONE player per spin, so 5 gives a real choice (adds Zadar 2001)
 
+// CAREER-MODAL POSITION. The roster API labels a player's position per club-season, and it
+// disagrees with itself for tweeners: Othello Hunter is tagged F at Olympiacos but C at his six
+// other clubs, so a season shows "only one center". We collapse each player to ONE position for
+// the whole game: the position he played the most (weighted by games played, so a full season
+// outvotes a cameo), ties broken toward his most-recent season. This is a display+eligibility fix
+// AND it feeds the position-relative z-scoring, so a career center is finally judged against
+// centers everywhere. Idempotent: the raw per-season tag is stashed in `posRaw` on first pass.
+export function applyCareerPositions(data) {
+  const votes = new Map(); // playerCode -> { pos: gpWeight }
+  const recent = new Map(); // playerCode -> { season, pos } of latest row
+  for (const pl of data.players) {
+    if (pl.posRaw === undefined) pl.posRaw = pl.pos; // stash once, stay idempotent
+    const raw = pl.posRaw;
+    if (!votes.has(pl.playerCode)) votes.set(pl.playerCode, {});
+    const v = votes.get(pl.playerCode);
+    v[raw] = (v[raw] || 0) + Math.max(1, pl.gp || 0);
+    const r = recent.get(pl.playerCode);
+    if (!r || pl.season > r.season) recent.set(pl.playerCode, { season: pl.season, pos: raw });
+  }
+  const modal = new Map();
+  for (const [code, v] of votes) {
+    let best = null, bestW = -1;
+    for (const pos of Object.keys(v)) {
+      if (v[pos] > bestW) { bestW = v[pos]; best = pos; }
+    }
+    // tie-break: if the most-recent season's position is within the leaders, prefer it
+    const tied = Object.keys(v).filter((pos) => v[pos] === bestW);
+    if (tied.length > 1) best = tied.includes(recent.get(code).pos) ? recent.get(code).pos : best;
+    modal.set(code, best);
+  }
+  for (const pl of data.players) pl.pos = modal.get(pl.playerCode);
+  return data;
+}
+
 export async function loadData() {
   // Resolve relative to THIS module (web/src/data.js), not the page, so it works whether the
   // app is served from the repo root (production static deploy) or the dev server.
@@ -17,6 +51,7 @@ export async function loadData() {
 // Group players into (club, season) pools. Skip junk teamCodes (mid-season-transfer rows the
 // API concatenates with ";") and pools too small to draft from.
 export function buildClubSeasons(data) {
+  applyCareerPositions(data); // collapse tweeners to one career position before pooling
   const byId = new Map();
   for (const pl of data.players) {
     if (!pl.teamCode || pl.teamCode.includes(";")) continue;
