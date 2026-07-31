@@ -62,12 +62,12 @@ export function rosterSignature(players) {
 
 /* ---------------- share + persistence ---------------- */
 
-function catEmoji(score) {
+export function catEmoji(score) {
   if (score >= 4) return "🟩";
   if (score >= 1.5) return "🟨";
   return "🟥";
 }
-const STAGE_ICON = { champion: "🏆", lostfinal: "🥈", finalfour: "🎯" };
+export const STAGE_ICON = { champion: "🏆", lostfinal: "🥈", finalfour: "🎯" };
 
 // The spoiler-light share string: record, stage, and a five-square category grid (the red
 // square is your weakest link — the gate).
@@ -76,7 +76,8 @@ export function shareText({ dayKey, wins, losses, label, stage, categoryScores, 
   const pretty = new Date(dayKey + "T00:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short" });
   const icon = STAGE_ICON[stage] ? " " + STAGE_ICON[stage] : "";
   return `👑 King of Europe — Daily\n${pretty} · ${wins}–${losses} · ${label}${icon}\n${grid}` +
-    (streak > 1 ? `\n🔥 ${streak}-day streak` : "");
+    (streak > 1 ? `\n🔥 ${streak}-day streak` : "") +
+    `\n🔗 king-of-europe.pages.dev`;
 }
 
 const KEY = (dayKey) => "koe-daily-" + dayKey;

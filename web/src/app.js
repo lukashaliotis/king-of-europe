@@ -7,7 +7,7 @@ import { eligibleCoaches, coachDeltas, archetypeLabel, pedigreeLabel } from "./c
 import { legendsPool, LEGENDS_CHANCE } from "./legends.js";
 import {
   mulberry32, hashSeed, utcDayKey, dailySeed, buildDailyBoard, rosterSignature,
-  shareText, loadDaily, saveDaily, currentStreak, dailyHistory,
+  shareText, catEmoji, STAGE_ICON, loadDaily, saveDaily, currentStreak, dailyHistory,
 } from "./daily.js";
 import { initOnboarding } from "./onboarding.js";
 import {
@@ -1028,15 +1028,29 @@ function renderResult() {
   const total = post.rounds.length;
   const done = state.revealStage > total; // all rounds shown -> reveal the verdict + brag
   card.classList.remove("hidden");
-  const shareBlock = (done && state.mode === "daily")
-    ? (state.dailyPractice ? `<p class="dl-practice-note">Practice run — not counted.</p>` : "") +
-      `<div class="share-box"><pre class="share-pre" id="share-pre">${shareText({
+  // A copy-able result on EVERY mode. Daily keeps its dated/streak card + leaderboard link; Classic
+  // and Salary get a generic one. (Versus has its own result screen and never reaches here.)
+  const shareBox = (txt) =>
+    `<div class="share-box"><pre class="share-pre" id="share-pre">${txt}</pre>` +
+    `<button id="share-btn" class="mini-btn">Copy result</button></div>`;
+  let shareBlock = "";
+  if (done && state.mode === "daily") {
+    shareBlock = (state.dailyPractice ? `<p class="dl-practice-note">Practice run — not counted.</p>` : "") +
+      shareBox(shareText({
         dayKey: state.dailyDayKey, wins: res.wins, losses: res.losses,
         label: post.label, stage: post.stage, categoryScores: res.categoryScores,
         streak: state.dailyStreak,
-      })}</pre><button id="share-btn" class="mini-btn">Copy result</button></div>` +
-      (state.dailyPractice ? "" : `<button id="dl-leaderboard-btn" class="ghost-btn dl-lb-btn">See today's leaderboard →</button>`)
-    : "";
+      })) +
+      (state.dailyPractice ? "" : `<button id="dl-leaderboard-btn" class="ghost-btn dl-lb-btn">See today's leaderboard →</button>`);
+  } else if (done) {
+    const grid = CATEGORIES.map((k) => catEmoji(res.categoryScores[k])).join("");
+    const icon = STAGE_ICON[post.stage] ? " " + STAGE_ICON[post.stage] : "";
+    const cap = salaryMode() ? ` · ${formatMoney(salarySpent())}` : "";
+    const modeLabel = salaryMode() ? "Salary Cap" : "Classic";
+    shareBlock = shareBox(
+      `👑 King of Europe — ${modeLabel}\n${res.wins}–${res.losses} · ${post.label}${icon}${cap}\n${grid}\n🔗 king-of-europe.pages.dev`
+    );
+  }
   card.innerHTML =
     `<div class="reg-label">Regular season</div>` +
     `<div class="record${perfect ? " perfect" : ""} pop">${res.wins}–${res.losses}</div>` +
