@@ -117,23 +117,25 @@ this is one test. No changes until the numbers say so. (Build under `sim/`.)
 
 ---
 
-## 6. Legends real stats — QUEUED
+## 6. Legends real stats — RESEARCHED → keep estimates
 
-`web/src/legends.js` RAW[] currently holds **estimated** prime lines for the 12 legends (labeled
-"estimated" in the UI). Replace with **verified European (non-NBA) per-game stats** where findable
-(Petrović, Sabonis, Kukoč, Divac are best-documented; Galis/Đorđević/Bodiroga/Epi/Savić patchier).
-Where no reliable source exists, keep the estimate.
+Researched (2026). Finding: **only scoring is reliably documented** for these players' European
+primes; rebounds/assists/steals/blocks/TS% were not recorded per-game in 1980s–90s European leagues.
+The verified scoring *matches our estimates* (Petrović ~28–34 Euro / est 28; Galis 30+ / est 30;
+Kukoč ~19–20 / est 20; Sabonis prime ~22 / est 22). So **no verified full line exists to swap in —
+estimates retained** and confirmed sound. Only revisit if a structured historical source surfaces.
+Optional cosmetic nudge available: Petrović scoring 28→~30 (his European-competition prime was 33.8
+at Cibona / 28.3 at Real) — deferred as it risks making one legend an outlier.
 
 ---
 
-## 7. Team-completeness check + mystery club — QUEUED
+## 7. Team-completeness check + mystery club — DONE
 
-- Audit team count per season vs. the official EuroLeague field to confirm no club was dropped by the
-  pipeline. (Partial: verified all **544 spinnable club-seasons now resolve to a named arena**, i.e.
-  no more "Neutral venue"; the per-season *roster* completeness audit is still to do.)
-- **`MCT`** in `web/src/clubs.js` has colours but **no name and zero spinnable seasons** in the data
-  → identify it or delete the dead entry. (`GSS` was the other unnamed one — now identified as
-  **Zastal/Stelmet Zielona Góra**, Hala CRS.)
+- Audited distinct spinnable clubs per season: **24 (2002–15) → 16 (2016–18) → 18 (2019–24) → 20
+  (2025)**, matching EuroLeague's real field-size history exactly. **No teams dropped by the
+  pipeline.** (2001 = 31, the inaugural big field.)
+- **`MCT`** had **0 player rows** → dead entry, **removed** from `web/src/clubs.js`. (`GSS` was the
+  other unnamed one — identified as **Zastal/Stelmet Zielona Góra**, Hala CRS.)
 
 ---
 
