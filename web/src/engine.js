@@ -24,6 +24,21 @@ const RATE_CATEGORIES = new Set(["efficiency"]);
 // their raw z-scores add as if they could. These get damped by the usage-collision term.
 const COLLISION_CATEGORIES = ["scoring", "playmaking"];
 
+// RELATIVE GATE. The weakest-link gate used to be the lowest RAW category sum, which is biased:
+// rebounding & defense stack freely (typically high) while playmaking & efficiency are structurally
+// low, so the gate landed on those two ~83% of the time. We instead judge each category against its
+// TYPICAL team level (measured over realistic drafts in sim/category_diag.mjs) — lifting the
+// naturally-low categories and lowering the naturally-high ones before taking the min — so ANY
+// category can be your weak link. Strength (the sum) is untouched, so this only changes WHICH
+// category caps you, not your raw power.
+const CAT_TYPICAL = { scoring: 3.23, rebounding: 4.58, playmaking: 2.16, defense: 4.44, efficiency: 1.85 };
+const GATE_SHIFT = (() => {
+  const avg = CATEGORIES.reduce((a, k) => a + CAT_TYPICAL[k], 0) / CATEGORIES.length;
+  const s = {};
+  for (const k of CATEGORIES) s[k] = CAT_TYPICAL[k] - avg; // + for high cats, − for low cats
+  return s;
+})();
+
 // Default tunable parameters. These are PLACEHOLDERS to be calibrated empirically against real
 // rosters (build step 3) — do not treat them as final.
 export const DEFAULT_PARAMS = {
@@ -65,12 +80,13 @@ export const DEFAULT_PARAMS = {
   // they never were under the old single win curve: gameSteep sets how fast a good team's p
   // saturates toward 1 (i.e. the thickness of the 38-0 tail) while leagueS shifts the median.
   // At leagueS 20, steep 0.44->0.30 cut 38-0 from 6.8% to 1.9% and cost ONE median win.
-  // RE-TUNED (sim/retune2.mjs) after the spin weighting was flattened to sqrt: the gentler spin
-  // serves weaker club-years, so a given draft is a little weaker -> leagueS lowered 18->16.5 to
-  // restore the median, gameSteep 0.26->0.23 to keep the 38-0 tail in check.
-  // Locked at 16.5 / 0.23 -> 38-0 1.9%, median 25, p75 31, p90 35 (base ~0%). Same difficulty as
-  // before the spin change, now over a wider variety of clubs.
-  leagueS: 16.5,
+  // RE-TUNED (sim/retune2.mjs) across three changes that all shifted difficulty: (1) spin weighting
+  // flattened to sqrt (weaker typical draft), (2) the RELATIVE gate, (3) the 6th-man buff to 0.80.
+  // They roughly cancelled on the median (leagueS stays 18), but the top end got a touch fatter, so
+  // gameSteep dropped 0.26->0.23 to keep the 38-0 tail thin.
+  // Locked at 18 / 0.23 -> 38-0 1.8%, median 25, p75 31, p90 35 (base ~0%). Same difficulty as the
+  // original, now with more club variety AND a more evenly-spread weakest-link category.
+  leagueS: 18.0,
   gameSteep: 0.23,
 };
 
@@ -254,14 +270,16 @@ export function projectRecord(roster, seasons, params = DEFAULT_PARAMS, arenaMul
 
   const strength = CATEGORIES.reduce((acc, k) => acc + categoryScores[k], 0);
 
-  // The ceiling uses the SOFT-min (so a second sagging category also costs you); the label still
-  // names the single worst category, which is what the player can actually act on.
-  const gate = softMin(CATEGORIES.map((k) => categoryScores[k]), p.softMinBeta);
+  // The ceiling uses the SOFT-min over category scores judged RELATIVE to their typical level (so a
+  // second sagging category also costs you); the label names the single worst category, which is
+  // what the player can actually act on.
+  const gate = softMin(CATEGORIES.map((k) => categoryScores[k] - GATE_SHIFT[k]), p.softMinBeta);
   let worst = Infinity;
   let gateCategory = null;
   for (const k of CATEGORIES) {
-    if (categoryScores[k] < worst) {
-      worst = categoryScores[k];
+    const rel = categoryScores[k] - GATE_SHIFT[k];
+    if (rel < worst) {
+      worst = rel;
       gateCategory = k;
     }
   }
@@ -297,8 +315,9 @@ export function projectRecord(roster, seasons, params = DEFAULT_PARAMS, arenaMul
 export function playerUsage(pl) {
   return pl.mpg > 0 && pl.box ? pl.box.fga / pl.mpg : 0.29;
 }
-const BENCH_MINUTES = 0.55; // a 6th man plays ~half a starter's minutes — keeps him a boost,
-                            // not a sixth starter (which over-inflated 38-0 and crushed the curve)
+const BENCH_MINUTES = 0.80; // a 6th man plays a solid chunk of minutes: ~+1.8 wins on average (was
+                            // 0.55 ≈ +1.3, too weak), and more when he patches your weakest category.
+                            // Capped below a sixth starter by design — he only adds his POSITIVE z's.
 export function benchValue(pl) {
   const u = playerUsage(pl);
   const t = Math.max(0, Math.min(1, (u - 0.20) / 0.20)); // 0 at low usage, 1 at high

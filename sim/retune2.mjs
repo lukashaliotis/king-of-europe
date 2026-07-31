@@ -118,7 +118,7 @@ console.log(`playthroughs per row: ${N}\n`);
 console.log(`leagueS steep | FULL 38-0%  med  p75  p90 | BASE 38-0%  p90  max`);
 for (const usageBudget of [1.55]) {
   for (const collisionK of [3.2]) {
-    for (const [leagueS, gameSteep] of [[16.5, 0.23]]) {
+    for (const [leagueS, gameSteep] of [[18, 0.23]]) {
       const softMinBeta = 1.2;
       const params = { collisionK, softMinBeta, leagueS, gameSteep, usageBudget };
       const r = run(params, N, 12345);
