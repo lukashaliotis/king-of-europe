@@ -218,6 +218,32 @@ lighter round-list (`renderRounds`), which is KEPT. Verified rendering in the pr
   + coach + record + round of elimination; text names only, no logos). Daily: default share stays
   **spoiler-free** (record + round only) with an **option to share the full card**. User picked PNG image.
 
+## 12. Playtest batch — APPLIED
+
+From a live playtest:
+- **Difficulty softened ("Balanced" profile, `sim/softtune.mjs`).** Measured a brutal skill cliff: a
+  casual "chase points" five had a **median of 7 wins and went 0-38 ~4%** of the time. Two new engine
+  levers + a gentler curve: `gateFloor 0.35` (a blind spot caps you but no longer zeroes an otherwise
+  strong roster — the 0-38 cause), `winFloor 0.05` (even a poor five steals a few), `leagueS 18→16`,
+  `gameSteep 0.23→0.22`. Result: casual median ~12 (0-38 → 0.7%), skilled median ~29, 38-0 ~3.2%.
+  FF curve re-checked (`bracket_diag`): 20-23 reach FF 6%, juggernaut title 47%, overall title 6.0% —
+  still good, no seed re-tune needed. The gate floor deliberately trades a little "weak-link matters"
+  for not punishing a single blind spot with a winless season.
+- **Category bars rebuilt** (`app.js catBarsHTML`, `style.css`). Were raw category sums, so playmaking
+  (typical ~2.2) always looked half as full as rebounding (typical ~4.6) → felt like a permanent weak
+  link. Now each bar is shown RELATIVE TO ITS OWN TYPICAL (`CAT_TYPICAL`, now exported), centre = par,
+  with a heat colour (red = below par / weak link, amber = par, green = a strength) and a centre tick.
+  Partial rosters are projected to a full five (`×5/n`) so the scale no longer lurches on the 5th pick.
+- **Coach labels** (`coaches.js`): derived-tilt labels now use the archetype vocabulary — scoring→
+  "Up-tempo", rebounding→"Physical" (no more off-palette "Scoring"/"Rebounding" tags).
+- **Arena badges** (`app.js`): the club's 3-letter colour badge now shows beside each building in the
+  arena candidate list AND the spin reel.
+- **TS% display clamped** to ≤100% (`app.js boxLine`): Aleksandar Mitrovic (PAR 2009-10, 7 gp @ 2.9 mpg)
+  showed 129% TS — a tiny-sample artifact, the only such player; he was already unqualified and
+  contributes ~nothing to the sim. Display-only clamp.
+- **Non-issue:** "Elan Chalonnais 2012-13 Jean-Baptiste-Adolphe" — real player (Michel
+  Jean-Baptiste-Adolphe, the hyphenated part is the surname). No change.
+
 ## Rejected approaches (don't re-litigate without new data)
 
 - **Auto-deriving coach archetypes from box scores — REJECTED (twice).** Player box scores track the

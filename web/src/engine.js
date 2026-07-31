@@ -31,7 +31,7 @@ const COLLISION_CATEGORIES = ["scoring", "playmaking"];
 // naturally-low categories and lowering the naturally-high ones before taking the min — so ANY
 // category can be your weak link. Strength (the sum) is untouched, so this only changes WHICH
 // category caps you, not your raw power.
-const CAT_TYPICAL = { scoring: 3.23, rebounding: 4.58, playmaking: 2.16, defense: 4.44, efficiency: 1.85 };
+export const CAT_TYPICAL = { scoring: 3.23, rebounding: 4.58, playmaking: 2.16, defense: 4.44, efficiency: 1.85 };
 const GATE_SHIFT = (() => {
   const avg = CATEGORIES.reduce((a, k) => a + CAT_TYPICAL[k], 0) / CATEGORIES.length;
   const s = {};
@@ -86,8 +86,17 @@ export const DEFAULT_PARAMS = {
   // gameSteep dropped 0.26->0.23 to keep the 38-0 tail thin.
   // Locked at 18 / 0.23 -> 38-0 1.8%, median 25, p75 31, p90 35 (base ~0%). Same difficulty as the
   // original, now with more club variety AND a more evenly-spread weakest-link category.
-  leagueS: 18.0,
-  gameSteep: 0.23,
+  // RE-TUNED (the "Balanced" profile, sim/softtune.mjs): measured a brutal skill cliff — a casual
+  // "chase points" five had a MEDIAN of 7 wins and went 0-38 ~4% of the time. Softened with a gate
+  // floor + win floor (below) and a gentler curve (leagueS 18->16, gameSteep 0.23->0.22) so a casual
+  // now medians ~12 and almost never goes winless, while skilled play stays clearly ahead (~29 median,
+  // 38-0 ~3.2%). The weak link still bites — just not fatally.
+  leagueS: 16.0,
+  gameSteep: 0.22,
+  // gateFloor: a single blind spot caps you hard but no longer zeroes an otherwise-strong roster
+  // (the thing that produced 0-38 casual seasons). winFloor: even a poor five steals a few games.
+  gateFloor: 0.35,
+  winFloor: 0.05,
 };
 
 const HOME_GAMES = GAMES / 2; // 19 home, 19 away — the arena is a HOME edge, not a global one
@@ -161,8 +170,11 @@ function gateTransform(gate, p) {
   if (p.gateTransform === "shift") {
     return Math.max(0, gate + p.shiftC);
   }
-  // sigmoid (default): bounded in (0,1); a terrible category asymptotes toward a hard cap.
-  return logistic(gate, p.gateSteep, p.gateMid);
+  // sigmoid (default): bounded in (0,1); a terrible category asymptotes toward a hard cap. The
+  // gateFloor lifts that cap off zero: a single blind spot should still cost you dearly, but it
+  // shouldn't zero out an otherwise-strong roster (which sent casual, "chase points" fives to 0-38).
+  const floor = p.gateFloor || 0;
+  return floor + (1 - floor) * logistic(gate, p.gateSteep, p.gateMid);
 }
 
 // z-score one player's category value against their own season+POSITION baseline, then apply
@@ -289,8 +301,10 @@ export function projectRecord(roster, seasons, params = DEFAULT_PARAMS, arenaMul
   // negative base by only exponentiating the (non-negative) gate factor, never strength.
   const S = strength * Math.pow(gPrime, p.gamma);
 
-  // Per-game probability against a league-average opponent, then an actual seeded season.
-  const pGame = logistic(S, p.gameSteep, p.leagueS);
+  // Per-game probability against a league-average opponent, then an actual seeded season. The
+  // winFloor is the chance even a poor five steals any single game — real bad teams still win a
+  // handful, and it means a blind spot yields ~a rough season, never a literal 0-38.
+  const pGame = Math.max(p.winFloor || 0, logistic(S, p.gameSteep, p.leagueS));
   const wins = playSeason(pGame, seedFromRoster(roster), arenaMult);
 
   return {

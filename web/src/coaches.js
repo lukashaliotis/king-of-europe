@@ -174,8 +174,10 @@ export function coachLabel(profile) {
   if (profile.archetype) return ARCHETYPES[profile.archetype].label;
   const strength = Math.max(...CATEGORIES.map((k) => Math.abs(profile.tilt[k])));
   if (strength < 0.04) return "Balanced";
+  // Use the SAME vocabulary as the hand-rated archetypes (ARCHETYPES labels) so a derived coach
+  // never shows an off-palette tag like "Scoring" or "Rebounding".
   const LABELS = {
-    scoring: "Scoring", rebounding: "Rebounding", playmaking: "Motion",
+    scoring: "Up-tempo", rebounding: "Physical", playmaking: "Motion",
     defense: "Defensive", efficiency: "Efficient",
   };
   return LABELS[profile.top];

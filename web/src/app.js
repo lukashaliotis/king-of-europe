@@ -1,4 +1,4 @@
-import { projectRecord, CATEGORIES, GAMES, benchValue } from "./engine.js";
+import { projectRecord, CATEGORIES, GAMES, benchValue, CAT_TYPICAL } from "./engine.js";
 import { loadData, buildClubSeasons, spin } from "./data.js";
 import { clubStyle, monogram } from "./clubs.js";
 import { runPostseason } from "./postseason.js";
@@ -87,7 +87,7 @@ const surname = (name) => prettyName(name).split(",")[0];
 function boxLine(p) {
   const b = p.box;
   return `<b>${b.pts.toFixed(1)}</b> PTS · <b>${b.reb.toFixed(1)}</b> REB · <b>${b.ast.toFixed(1)}</b> AST · ` +
-    `<b>${b.stl.toFixed(1)}</b> STL · <b>${b.blk.toFixed(1)}</b> BLK · <b>${Math.round(b.ts * 100)}%</b> TS`;
+    `<b>${b.stl.toFixed(1)}</b> STL · <b>${b.blk.toFixed(1)}</b> BLK · <b>${Math.min(100, Math.round(b.ts * 100))}%</b> TS`;
 }
 function textOn(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -409,19 +409,22 @@ function spinArena() {
   }
   const rand = state.mode === "daily" ? dailyArenaRand() : Math.random();
   const target = weighted[(rand * weighted.length) | 0];
-  const arenaName = (i) => { const s = state.slots[i]; return arenaFor(s._src.teamCode, s.season).name; };
+  // each reel frame carries the club badge (3-letter, team colours) beside its building's name.
+  const reelItem = (i) => {
+    const s = state.slots[i];
+    return badge(s._src.teamCode) + `<span class="reel-arena">${arenaFor(s._src.teamCode, s.season).name}</span>`;
+  };
 
   // cycle through the actual candidate buildings, slower (it's only a handful) and readable.
-  const names = choices.map(arenaName);
   state.arenaRolling = true;
   render();
-  const N = names.length * 3 + 3;
+  const N = choices.length * 3 + 3;
   let i = 0;
   clearTimeout(spinTimer);
   const tick = () => {
     const r = el("arena-reel");
     if (i >= N) {
-      if (r) { r.textContent = arenaName(target); r.classList.add("landed"); }
+      if (r) { r.innerHTML = reelItem(target); r.classList.add("landed"); }
       spinTimer = setTimeout(() => {
         // 1) reveal the won arena BIG in the left panel; 2) sweep the court a beat later;
         // 3) advance to the coach step.
@@ -432,7 +435,7 @@ function spinArena() {
       }, 260);
       return;
     }
-    if (r) r.textContent = names[i % names.length]; // wheel through the real options
+    if (r) r.innerHTML = reelItem(choices[i % choices.length]); // wheel through the real options
     const t = i / N;
     const delay = 150 + Math.pow(t, 1.8) * 170; // slower, readable, gentle settle
     i++;
@@ -806,7 +809,7 @@ function renderCommit() {
       // show the candidate buildings first, then spin among them
       const list = arenaChoices().map((i) => {
         const s = state.slots[i], a = arenaFor(s._src.teamCode, s.season);
-        return `<li>🏟 <b>${a.name}</b> <span class="muted">${clubStyle(s._src.teamCode).abbr} ${s._src.seasonLabel}` +
+        return `<li>${badge(s._src.teamCode)} <b>${a.name}</b> <span class="muted">${s._src.seasonLabel}` +
           ` · <span class="flames">${arenaFlames(a.rating)}</span></span></li>`;
       }).join("");
       box.innerHTML = `<div class="commit-inner"><h3>Your five is set</h3>` +
@@ -981,15 +984,30 @@ function startReveal() {
   }, 1050);
 }
 
+// A category's standing shown RELATIVE TO ITS OWN TYPICAL LEVEL, so playmaking (typically ~2.2) and
+// rebounding (typically ~4.6) read on the same footing — the centre of every bar is "league-average
+// for that category", left of centre is a weak spot, right is a strength. Colour is a heat scale:
+// red = below par (your weak link), amber = about par, green = a real strength.
+const REL_SPAN = 5; // how far above/below typical fills a full half-bar
+function heatColor(rel) {
+  const t = Math.max(0, Math.min(1, (rel + REL_SPAN) / (2 * REL_SPAN))); // 0 = deep red … 1 = green
+  const hue = t * 120; // 0 red → 60 amber (at par) → 120 green
+  return `hsl(${hue.toFixed(0)}, 70%, ${(54 - t * 6).toFixed(0)}%)`;
+}
+
 // The category bars markup, shared by the sidebar (while drafting) and the record card (final).
-function catBarsHTML(res) {
+// `n` is the roster size behind `res`; a partial roster is projected to a full five so the scale
+// stays steady from the first pick to the fifth (no lurch when the last player lands).
+function catBarsHTML(res, n = 5) {
   const gateCat = res ? res.gateCategory : null;
+  const scale = res ? 5 / Math.max(1, n) : 1;
   return CATEGORIES.map((k) => {
-    const score = res ? res.categoryScores[k] : 0;
-    const pct = Math.min(50, (Math.abs(score) / MAXCAT) * 50);
-    const fill = score >= 0 ? `left:50%; width:${pct}%` : `left:${50 - pct}%; width:${pct}%`;
+    const rel = res ? res.categoryScores[k] * scale - CAT_TYPICAL[k] : -REL_SPAN;
+    const pct = Math.min(50, (Math.abs(rel) / REL_SPAN) * 50);
+    const fill = rel >= 0 ? `left:50%; width:${pct}%` : `left:${50 - pct}%; width:${pct}%`;
+    const color = res ? heatColor(rel) : "var(--line)";
     return `<div class="cat-row${k === gateCat ? " isgate" : ""}"><span class="lbl">${k}</span>` +
-      `<div class="cat-track"><div class="cat-fill ${score < 0 ? "neg" : ""}" style="${fill}"></div></div></div>`;
+      `<div class="cat-track"><div class="cat-fill" style="${fill}; background:${color}"></div></div></div>`;
   }).join("");
 }
 
@@ -1000,7 +1018,7 @@ function renderCats() {
   wrap.classList.remove("hidden");
   const picks = filled();
   const res = picks.length ? projectRecord(picks, state.data.seasons, undefined, 1, coachCatDeltas(), state.sixth) : null;
-  el("cat-bars").innerHTML = catBarsHTML(res);
+  el("cat-bars").innerHTML = catBarsHTML(res, picks.length);
   el("gate-note").textContent = res && picks.length >= 2 ? `Weakest link: ${res.gateCategory}` : "";
 }
 

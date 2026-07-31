@@ -369,9 +369,9 @@ h3 { font-size: 0.82rem; margin: 0 0 0.6rem; color: var(--muted); text-transform
 .cat-row { display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 0.45rem; margin-bottom: 0.25rem; }
 .cat-row .lbl { font-size: 0.72rem; color: var(--muted); text-transform: capitalize; }
 .cat-track { background: var(--bg-2); border-radius: 6px; height: 10px; position: relative; overflow: hidden; }
-.cat-fill { position: absolute; top: 0; bottom: 0; left: 50%; background: var(--accent); border-radius: 6px; }
-.cat-fill.neg { background: var(--bad); }
-.cat-row.isgate .cat-fill { background: var(--gate); }
+/* the "par" line — centre of the track is league-average for that category */
+.cat-track::before { content: ""; position: absolute; left: 50%; top: 1px; bottom: 1px; width: 1px; background: var(--line); transform: translateX(-50%); z-index: 1; }
+.cat-fill { position: absolute; top: 0; bottom: 0; left: 50%; background: var(--accent); border-radius: 6px; transition: left 0.25s ease, width 0.25s ease, background 0.25s ease; }
 .cat-row.isgate .lbl { color: var(--gate); font-weight: 700; }
 .gate-note { font-size: 0.8rem; color: var(--gate); min-height: 1.2rem; margin: 0.5rem 0 0; }
 
@@ -497,7 +497,11 @@ body[data-revealed="1"] #place-hint { display: none; }
 }
 .reel-box.year { font-size: 1.55rem; }
 .reel-box.fixed { opacity: 0.45; border-color: var(--line); box-shadow: none; }
-.reel-box.arena { font-size: 1.15rem; min-width: 240px; padding: 0.85rem 1rem; }
+.reel-box.arena { font-size: 1.15rem; min-width: 240px; padding: 0.85rem 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+.reel-box.arena .badge { width: 34px; height: 34px; border-radius: 9px; font-size: 0.74rem; }
+.reel-arena { font-size: 0.98rem; line-height: 1.15; }
+.commit-inner li { display: flex; align-items: center; gap: 0.5rem; }
+.commit-inner li .badge { width: 30px; height: 30px; border-radius: 8px; font-size: 0.66rem; }
 
 /* Arena: candidate list + big reveal */
 .arena-list { list-style: none; padding: 0; margin: 0.6rem 0 1rem; text-align: left; display: flex; flex-direction: column; gap: 0.3rem; }
