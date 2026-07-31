@@ -38,9 +38,11 @@ export function buildClubSeasons(data) {
     pool.players.sort((a, b) => playerStrength(b, data.seasons) - playerStrength(a, data.seasons));
     const top5 = pool.players.slice(0, 5).reduce((a, p) => a + Math.max(0, playerStrength(p, data.seasons)), 0);
     pool.ceiling = top5;
-    // Gentle weighting toward stronger clubs so recognizable teams appear a bit more often,
-    // while mid-tier clubs stay common (variety is the point of the spin).
-    pool.weight = Math.max(0.5, top5);
+    // SQRT weighting: still leans toward stronger clubs (recognizable teams show up a bit more)
+    // but far gentler than linear, so mid- and small-tier club-years stay in regular rotation.
+    // (Linear made elite club-seasons ~2x over-represented and the game noticeably easier; the
+    // difficulty this removes is restored in the win-curve calibration, not by re-skewing the spin.)
+    pool.weight = Math.max(0.7, Math.sqrt(top5));
     pools.push(pool);
   }
   return pools;
