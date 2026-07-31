@@ -207,12 +207,16 @@ behind the `seasons` arg so **Versus is unchanged**; client (`app.js`) and serve
 wins (p10 31); ~70 distinct clubs still appear across 180 days (variety preserved). User decisions:
 floor = Final-capable; daily bracket randomness stays **per-five** (consistent with other modes).
 
+**Real bracket view + toggle — APPLIED** (`web/src/app.js`, `web/src/style.css`). A seeded bracket
+ladder: an entry node (`seedFor(wins)` → 1st–6th straight in, 7th–10th play-in) then each tie as a
+two-sided matchup with both scores, winner highlighted green, losing tie edged red, connected by a
+spine. A `Bracket / Summary` toggle (`state.resultView`, default `bracket`) switches to the original
+lighter round-list (`renderRounds`), which is KEPT. Verified rendering in the preview.
+
 **Still QUEUED (frontend, this pass):**
-- **Real bracket view + toggle.** Visualize seed→play-in→playoffs(bo5)→FF→Final with opponents/scores
-  (the `rounds` array already carries it). KEEP the current lighter "summary" view; toggle between them.
-- **Court-card share.** Classic/Salary: a rendered card (court + five by position + coach + record +
-  round of elimination; text names only, no logos). Daily: default share stays **spoiler-free** (record
-  + round only) with an **option to share the full card**.
+- **Court-card share (PNG).** Classic/Salary: a rendered downloadable IMAGE (court + five by position
+  + coach + record + round of elimination; text names only, no logos). Daily: default share stays
+  **spoiler-free** (record + round only) with an **option to share the full card**. User picked PNG image.
 
 ## Rejected approaches (don't re-litigate without new data)
 

@@ -58,6 +58,7 @@ const state = {
   justSpun: false,   // triggers the roster cascade for one render
   courtRevealed: false, // arena outcome shows first; the court transforms a beat later
   revealStage: 0,    // how many bracket rounds have been revealed (auto-advance)
+  resultView: "bracket", // "bracket" (real seeded bracket) | "summary" (lighter round list)
   mode: "classic",   // "classic" (free play) | "daily" (seeded shared board) | "versus" (H2H)
   dailyBoard: null,  // the six pre-drawn (club, season) offers for today
   dailyDayKey: null, // the UTC day the board belongs to
@@ -1017,6 +1018,45 @@ function renderRounds(post, shown) {
   }).join("") + `</div>`;
 }
 
+// Where a record slots you in the standings (flavour, deterministic from wins): 1–6 go straight to
+// the playoffs, 7–10 into the play-in. Mirrors the cutoffs in postseason.js.
+function seedFor(wins) {
+  if (wins >= 24) return Math.max(1, Math.min(6, 1 + Math.round((34 - wins) / 2))); // 34+→1 … 24-25→6
+  if (wins >= 20) return Math.min(10, 30 - wins); // 23→7, 22→8, 21→9, 20→10
+  return null; // missed the postseason
+}
+const ordinal = (n) => n + (["th", "st", "nd", "rd"][(n % 100 - n % 10 === 10) ? 0 : n % 10] || "th");
+
+// The REAL bracket view: an entry node (your seed / finish) then each tie as a two-sided matchup
+// with both scores, the winner highlighted. Same `shown` reveal as the summary list.
+function renderBracket(post, res, shown) {
+  const seed = seedFor(res.wins);
+  const entryNote = res.wins >= 24 ? "Straight into the playoffs"
+    : res.wins >= 20 ? "Into the play-in" : "Missed the postseason";
+  const entry =
+    `<div class="bk-entry pop">` +
+      (seed ? `<span class="bk-seed">${ordinal(seed)} seed</span>` : `<span class="bk-seed miss">—</span>`) +
+      `<span class="bk-entry-note">${entryNote}</span>` +
+    `</div>`;
+
+  const rounds = post.rounds.slice(0, shown).map((r) => {
+    const tally = r.series ? r.series.split(/[^\d]+/) : null; // "3–1" → ["3","1"], dash-agnostic
+    const you = tally ? tally[0] : r.us;
+    const opp = tally ? tally[1] : r.them;
+    const kind = r.series ? "Best-of-5" : "";
+    const club = `${clubStyle(r.opp.teamCode).abbr} ${r.opp.seasonLabel}`;
+    return `<div class="bk-tie ${r.win ? "won" : "out"} pop">` +
+      `<div class="bk-tie-head"><span class="bk-rname">${r.name}</span>` +
+        (kind ? `<span class="bk-kind">${kind}</span>` : "") + `</div>` +
+      `<div class="bk-match">` +
+        `<div class="bk-side ${r.win ? "adv" : "eliminated"}"><span class="bk-team">You</span><span class="bk-sc">${you}</span></div>` +
+        `<div class="bk-side ${r.win ? "eliminated" : "adv"}"><span class="bk-team">${club}</span><span class="bk-sc">${opp}</span></div>` +
+      `</div></div>`;
+  }).join("");
+
+  return `<div class="bracket">${entry}${rounds}</div>`;
+}
+
 // Left panel after the reveal: ONLY the record, the stage and the bracket, revealed in stages.
 function renderResult() {
   const card = el("result-card");
@@ -1051,10 +1091,19 @@ function renderResult() {
       `👑 King of Europe — ${modeLabel}\n${res.wins}–${res.losses} · ${post.label}${icon}${cap}\n${grid}\n🔗 king-of-europe.pages.dev`
     );
   }
+  const postseasonBlock = post.rounds.length
+    ? `<div class="view-toggle">` +
+        `<button class="vt-btn${state.resultView === "bracket" ? " on" : ""}" data-view="bracket">Bracket</button>` +
+        `<button class="vt-btn${state.resultView === "summary" ? " on" : ""}" data-view="summary">Summary</button>` +
+      `</div>` +
+      (state.resultView === "summary"
+        ? renderRounds(post, state.revealStage)
+        : renderBracket(post, res, state.revealStage))
+    : "";
   card.innerHTML =
     `<div class="reg-label">Regular season</div>` +
     `<div class="record${perfect ? " perfect" : ""} pop">${res.wins}–${res.losses}</div>` +
-    renderRounds(post, state.revealStage) +
+    postseasonBlock +
     (done
       ? `<div class="verdict stage-${post.stage} pop">${post.label}</div>` +
         (perfect ? `<div class="perfect-note">A perfect regular season.</div>` : "") +
@@ -1067,6 +1116,8 @@ function renderResult() {
         shareBlock
       : `<div class="reveal-dots">•••</div>`);
 
+  card.querySelectorAll(".vt-btn").forEach((b) =>
+    b.addEventListener("click", () => { state.resultView = b.dataset.view; renderResult(); }));
   const lb = el("dl-leaderboard-btn");
   if (lb) lb.addEventListener("click", () => reset()); // lands on the lockout, which shows the board
   const sb = el("share-btn");
