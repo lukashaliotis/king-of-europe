@@ -2,7 +2,7 @@
 // faces the SAME six club-year draws on a given day and results are directly comparable
 // (Wordle-style). No re-spins: the board is the challenge. Shared, reproducible, shareable.
 import { spin } from "./data.js";
-import { CATEGORIES } from "./engine.js";
+import { CATEGORIES, projectRecord, playerStrength, DEFAULT_PARAMS } from "./engine.js";
 
 // Small, fast, seedable PRNG (same generator the Node tuning harness uses).
 export function mulberry32(a) {
@@ -33,9 +33,9 @@ export function dailySeed(dayKey = utcDayKey()) {
   return hashSeed("KOE-" + dayKey);
 }
 
-// Pre-draw the day's board: `size` distinct (club, season) offers, deterministic from the seed.
+// One draw of the day's board: `size` distinct (club, season) offers, deterministic from the seed.
 // At most one Legends slot; no duplicate club-years.
-export function buildDailyBoard(pools, legends, legendsChance, seed, size = 6) {
+function drawBoard(pools, legends, legendsChance, seed, size) {
   const rng = mulberry32(seed);
   const board = [];
   const used = new Set();
@@ -53,6 +53,87 @@ export function buildDailyBoard(pools, legends, legendsChance, seed, size = 6) {
     board.push(pool);
   }
   return board;
+}
+
+// DAILY WINNABILITY FLOOR. Everyone worldwide faces the same board, so a weak draw would mean a day
+// nobody can go deep. We require the board's OPTIMAL five (best legal 2G/2F/1C achievable across the
+// six draws) to project to at least a Final-capable strength — so "with the right moves" always
+// yields a real title run, while finding those moves stays hard. Bare five only (no coach/arena/6th,
+// which only add headroom), so the guarantee is a conservative floor.
+const FLOOR_WINS = 31; // Final-capable optimum
+const FLOOR_S = (() => {
+  const p = DEFAULT_PARAMS;
+  const pGame = FLOOR_WINS / 38;              // needed per-game win rate
+  return p.leagueS + Math.log(pGame / (1 - pGame)) / p.gameSteep; // invert the win-curve logistic
+})();
+const ROLES = ["G", "G", "F", "F", "C"];
+
+// Strength of the strongest legal five buildable from the board (one player per draw, five as
+// starters). Proxy-rank candidate fives by summed player strength, then score the top few through
+// the real engine (gate/collision) and return the best true S.
+function optimalFiveStrength(board, seasons) {
+  const stCache = new Map();
+  const strengthOf = (pl) => {
+    if (!stCache.has(pl)) stCache.set(pl, playerStrength(pl, seasons));
+    return stCache.get(pl);
+  };
+  // best player of each position within each draw
+  const bestByPos = board.map((pool) => {
+    const b = { G: null, F: null, C: null };
+    for (const pl of pool.players) {
+      if (!b[pl.pos] || strengthOf(pl) > strengthOf(b[pl.pos])) b[pl.pos] = pl;
+    }
+    return b;
+  });
+  const n = board.length;
+  const candidates = []; // { five, sum }
+  // pick which draw sits on the bench, assign the other five to ROLES (permutations)
+  for (let bench = 0; bench < n; bench++) {
+    const idx = [];
+    for (let i = 0; i < n; i++) if (i !== bench) idx.push(i);
+    const perm = (chosen, remainingRoles, remainingIdx) => {
+      if (!remainingRoles.length) {
+        let sum = 0;
+        for (const [pi, role] of chosen) sum += strengthOf(bestByPos[pi][role]);
+        candidates.push({ five: chosen.map(([pi, role]) => bestByPos[pi][role]), sum });
+        return;
+      }
+      const role = remainingRoles[0];
+      for (let j = 0; j < remainingIdx.length; j++) {
+        const pi = remainingIdx[j];
+        if (!bestByPos[pi][role]) continue; // this draw can't field that position
+        perm([...chosen, [pi, role]], remainingRoles.slice(1),
+             remainingIdx.filter((_, k) => k !== j));
+      }
+    };
+    perm([], ROLES, idx);
+  }
+  if (!candidates.length) return -Infinity;
+  candidates.sort((a, b) => b.sum - a.sum);
+  let bestS = -Infinity;
+  for (const c of candidates.slice(0, 4)) { // re-score the top few through the real engine
+    const S = projectRecord(c.five, seasons).S;
+    if (S > bestS) bestS = S;
+  }
+  return bestS;
+}
+
+// Pre-draw the day's board. When `seasons` is supplied (Daily), enforce the winnability floor by
+// deterministically re-seeding until the optimal five clears it; without it (Versus), draw once.
+// The re-seed sequence is a pure function of the base seed, so the browser and the server resolver
+// land on the identical board.
+export function buildDailyBoard(pools, legends, legendsChance, seed, size = 6, seasons = null) {
+  if (!seasons) return drawBoard(pools, legends, legendsChance, seed, size);
+  const MAX_ATTEMPTS = 40;
+  let best = null, bestS = -Infinity;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const s = (seed + attempt * 0x9e3779b1) >>> 0; // golden-ratio stride, deterministic
+    const board = drawBoard(pools, legends, legendsChance, s, size);
+    const optS = optimalFiveStrength(board, seasons);
+    if (optS >= FLOOR_S) return board;             // clears the floor
+    if (optS > bestS) { bestS = optS; best = board; } // keep the strongest fallback
+  }
+  return best; // nothing cleared the floor in MAX_ATTEMPTS → strongest board seen
 }
 
 // A stable signature of the drafted five, so the arena spin is reproducible for a given roster.

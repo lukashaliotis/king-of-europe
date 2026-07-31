@@ -136,7 +136,7 @@ function setMode(mode) {
 }
 function ensureDailyBoard() {
   state.dailyDayKey = utcDayKey();
-  state.dailyBoard = buildDailyBoard(state.pools, LEGENDS, LEGENDS_CHANCE, dailySeed(state.dailyDayKey));
+  state.dailyBoard = buildDailyBoard(state.pools, LEGENDS, LEGENDS_CHANCE, dailySeed(state.dailyDayKey), 6, state.data.seasons);
   state.dailyStreak = currentStreak();
   state.dailyPractice = false; // a fresh entry is the ranked attempt
 }

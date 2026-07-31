@@ -177,6 +177,43 @@ convert `arenaFlames`/`arenaSVG` thresholds accordingly (impact stays identical)
 
 ---
 
+## 11. Postseason overhaul — APPLIED (backend) / bracket-view + share-card QUEUED (frontend)
+
+The bracket used to ignore the season you played: a 20–23 bubble team reached the Final Four **62%**
+of the time and won the title **11%** (measured, `sim/bracket_diag.mjs`). Three backend fixes, all in
+`web/src/postseason.js` unless noted, all validated and mode-agnostic (regular-season 38-0 difficulty
+and the wins-only leaderboard are untouched):
+
+- **Seeding handicap — APPLIED.** Effective bracket strength `S = baseS + SEED_COEF·(wins − SEED_PIVOT)`
+  (`SEED_COEF 0.62`, `SEED_PIVOT 26`). Great record = high seed/home court/favourite; bubble = underdog.
+- **Deep-round escalation — APPLIED.** Semi opponent `+1.2`, Final opponent `+2.6`, so even a juggernaut
+  faces a real gauntlet (title stays earned, not automatic).
+- **Opponent realism — APPLIED.** `opponentTable` now ranks by a **depth-adjusted** score (best five +
+  `DEPTH_WEIGHT 0.15` × strength of the 6th-man-onward) so one-star minnows sink; `pickOpponent` draws
+  **weighted toward the strong end of each band** (`rng()*rng()`); bands tightened (playoffs 18→12%,
+  semi 6→5%, final 2→1.5%, play-in 35–65→28–55%). GAME strength is still the five that takes the floor;
+  depth only affects who you're matched against. NOTE: the data has **no real standings** — "realism" is
+  a paper-strength+depth proxy, not actual W-L.
+- **Resulting curve** (4000 drafts): reach FF 32-38 **99%** / 28-31 **86%** / 24-27 **58%** / 20-23 **16%**;
+  win title **60% / 16% / 6% / 0.2%**; overall title **4.5%** (was 8.1%).
+
+**Daily winnability floor — APPLIED** (`web/src/daily.js`). Everyone shares the board, so a weak draw =
+a day nobody can go deep (measured: **74%** of natural boards had an optimal five below Final-capable).
+`buildDailyBoard(..., seasons)` now computes the board's **optimal legal five** (`optimalFiveStrength`,
+a 6×perm search over best-by-position, top-4 re-scored through the real engine) and **deterministically
+re-seeds** (golden-ratio stride, ≤40 attempts) until it clears `FLOOR_WINS = 31` (Final-capable). Gated
+behind the `seasons` arg so **Versus is unchanged**; client (`app.js`) and server (`resolve.js`) pass
+`data.seasons` and land on the identical board (anti-cheat intact). Validated: floored optimum median 34
+wins (p10 31); ~70 distinct clubs still appear across 180 days (variety preserved). User decisions:
+floor = Final-capable; daily bracket randomness stays **per-five** (consistent with other modes).
+
+**Still QUEUED (frontend, this pass):**
+- **Real bracket view + toggle.** Visualize seed→play-in→playoffs(bo5)→FF→Final with opponents/scores
+  (the `rounds` array already carries it). KEEP the current lighter "summary" view; toggle between them.
+- **Court-card share.** Classic/Salary: a rendered card (court + five by position + coach + record +
+  round of elimination; text names only, no logos). Daily: default share stays **spoiler-free** (record
+  + round only) with an **option to share the full card**.
+
 ## Rejected approaches (don't re-litigate without new data)
 
 - **Auto-deriving coach archetypes from box scores — REJECTED (twice).** Player box scores track the

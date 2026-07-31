@@ -20,8 +20,8 @@ const LEGENDS = legendsPool();
 export function dailyPools(data) {
   return buildClubSeasons(data);
 }
-export function dailyBoard(pools, dayKey) {
-  return buildDailyBoard(pools, LEGENDS, LEGENDS_CHANCE, dailySeed(dayKey));
+export function dailyBoard(pools, dayKey, seasons) {
+  return buildDailyBoard(pools, LEGENDS, LEGENDS_CHANCE, dailySeed(dayKey), 6, seasons);
 }
 
 const fail = (error) => ({ ok: false, error });
@@ -42,7 +42,7 @@ function reconstruct(pool, code) {
  */
 export function resolveDaily(data, dayKey, submission) {
   const pools = dailyPools(data);
-  const board = dailyBoard(pools, dayKey);
+  const board = dailyBoard(pools, dayKey, data.seasons);
   const { starters: sIn, sixth: sixthIn, coach: coachCode } = submission || {};
 
   if (!Array.isArray(sIn) || sIn.length !== 5) return fail("need exactly five starters");
