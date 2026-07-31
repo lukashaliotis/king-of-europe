@@ -65,9 +65,13 @@ export const DEFAULT_PARAMS = {
   // they never were under the old single win curve: gameSteep sets how fast a good team's p
   // saturates toward 1 (i.e. the thickness of the 38-0 tail) while leagueS shifts the median.
   // At leagueS 20, steep 0.44->0.30 cut 38-0 from 6.8% to 1.9% and cost ONE median win.
-  // Locked at 18 / 0.26 -> 38-0 2.3%, median 25, p90 35.
-  leagueS: 18.0,
-  gameSteep: 0.26,
+  // RE-TUNED (sim/retune2.mjs) after the spin weighting was flattened to sqrt: the gentler spin
+  // serves weaker club-years, so a given draft is a little weaker -> leagueS lowered 18->16.5 to
+  // restore the median, gameSteep 0.26->0.23 to keep the 38-0 tail in check.
+  // Locked at 16.5 / 0.23 -> 38-0 1.9%, median 25, p75 31, p90 35 (base ~0%). Same difficulty as
+  // before the spin change, now over a wider variety of clubs.
+  leagueS: 16.5,
+  gameSteep: 0.23,
 };
 
 const HOME_GAMES = GAMES / 2; // 19 home, 19 away — the arena is a HOME edge, not a global one
