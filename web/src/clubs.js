@@ -29,7 +29,6 @@ const CLUBS = {
   MCO: { c1: "#da291c", c2: "#ffffff", ab: "MON" }, // Monaco
   AEK: { c1: "#f2c200", c2: "#111418", ab: "AEK" }, // AEK
   BAM: { c1: "#c8102e", c2: "#ffffff", ab: "BAM" }, // Bamberg
-  MCT: { c1: "#e4002b", c2: "#ffffff", ab: "MCT" },
   LEG: { c1: "#c8a23a", c2: "#111418", ab: "LEG" }, // European Legends — gold
 
   // --- the long tail. Previously these fell back to a hash-generated colour, which is why
