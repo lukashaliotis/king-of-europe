@@ -93,7 +93,7 @@ const PEDIGREE_STRONG = 1.12;
 const PEDIGREE = {
   WBC: PEDIGREE_LEGEND, // Obradović, Željko — far and away the most decorated
   WAF: PEDIGREE_ELITE,  // Messina, Ettore
-  WAG: PEDIGREE_ELITE,  // Ivković, Dušan
+  WAG: PEDIGREE_LEGEND, // Ivković, Dušan — a genuine legend of European coaching
   WBS: PEDIGREE_ELITE,  // Maljković, Božidar
   WCL: PEDIGREE_ELITE,  // Ataman, Ergin
   WCT: PEDIGREE_ELITE,  // Pešić, Svetislav
