@@ -984,22 +984,19 @@ function startReveal() {
   }, 1050);
 }
 
-// A category's standing shown RELATIVE TO ITS OWN TYPICAL LEVEL, so playmaking (typically ~2.2) and
-// rebounding (typically ~4.6) read on the same footing — the centre tick of every bar is
-// "league-average for that category", left of centre is a weak spot, right is a strength. Single
-// on-brand orange fill (like the original bars); the weakest link is called out by its label alone.
-const REL_SPAN = 5; // how far above/below typical fills a full half-bar
-
-// The category bars markup, shared by the sidebar (while drafting) and the record card (final).
-// `n` is the roster size behind `res`; a partial roster is projected to a full five so the scale
-// stays steady from the first pick to the fifth (no lurch when the last player lands).
-function catBarsHTML(res, n = 5) {
+// The category bars GROW as you draft (each shows the running total, from empty at the first pick
+// to full at the fifth — the gradual build). The un-skew: each category is divided by ITS OWN
+// typical (not one global number), so a typical playmaking (~2.2) fills the same as a typical
+// rebounding (~4.6) instead of looking permanently half-empty. A category at ~2x its typical fills
+// the bar. Single on-brand orange; the weakest link is called out by its highlighted label.
+const CAT_SPAN = 2.0; // a category at CAT_SPAN× its typical level fills the half-bar
+function catBarsHTML(res) {
   const gateCat = res ? res.gateCategory : null;
-  const scale = res ? 5 / Math.max(1, n) : 1;
   return CATEGORIES.map((k) => {
-    const rel = res ? res.categoryScores[k] * scale - CAT_TYPICAL[k] : 0;
-    const pct = Math.min(50, (Math.abs(rel) / REL_SPAN) * 50);
-    const fill = rel >= 0 ? `left:50%; width:${pct}%` : `left:${50 - pct}%; width:${pct}%`;
+    const score = res ? res.categoryScores[k] : 0;        // running total — builds as you draft
+    const norm = score / (CAT_TYPICAL[k] * CAT_SPAN);     // ÷ this category's typical: unskews it
+    const pct = Math.min(50, Math.abs(norm) * 50);
+    const fill = norm >= 0 ? `left:50%; width:${pct}%` : `left:${50 - pct}%; width:${pct}%`;
     return `<div class="cat-row${k === gateCat ? " isgate" : ""}"><span class="lbl">${k}</span>` +
       `<div class="cat-track"><div class="cat-fill" style="${fill}"></div></div></div>`;
   }).join("");
@@ -1012,7 +1009,7 @@ function renderCats() {
   wrap.classList.remove("hidden");
   const picks = filled();
   const res = picks.length ? projectRecord(picks, state.data.seasons, undefined, 1, coachCatDeltas(), state.sixth) : null;
-  el("cat-bars").innerHTML = catBarsHTML(res, picks.length);
+  el("cat-bars").innerHTML = catBarsHTML(res);
   el("gate-note").textContent = res && picks.length >= 2 ? `Weakest link: ${res.gateCategory}` : "";
 }
 

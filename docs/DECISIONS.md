@@ -229,13 +229,14 @@ From a live playtest:
   FF curve re-checked (`bracket_diag`): 20-23 reach FF 6%, juggernaut title 47%, overall title 6.0% —
   still good, no seed re-tune needed. The gate floor deliberately trades a little "weak-link matters"
   for not punishing a single blind spot with a winless season.
-- **Category bars rebuilt** (`app.js catBarsHTML`, `style.css`). Were raw category sums, so playmaking
-  (typical ~2.2) always looked half as full as rebounding (typical ~4.6) → felt like a permanent weak
-  link. Now each bar is shown RELATIVE TO ITS OWN TYPICAL (`CAT_TYPICAL`, now exported), diverging from
-  a centre "par" tick (left = below par, right = above). Partial rosters are projected to a full five
-  (`×5/n`) so the scale no longer lurches on the 5th pick. **Colour: user reviewed a 3-way mock and
-  chose the ORIGINAL single-orange fill** (a first heat-scale version red→amber→green was rejected —
-  "doesn't sit well"); the weakest link is now called out by its highlighted LABEL only, not fill colour.
+- **Category bars rebuilt** (`app.js catBarsHTML`, `style.css`) — iterated with the user to this final
+  form: bars show the RUNNING TOTAL so they **build gradually** as you draft (empty → full over the
+  five picks, the behaviour the user liked in the original), single on-brand ORANGE fill, weakest link
+  by highlighted LABEL only. The fix for the old skew (playmaking, typical ~2.2, always looked half as
+  full as rebounding, typical ~4.6): each category is divided by ITS OWN typical (`CAT_TYPICAL`, now
+  exported; `CAT_SPAN 2.0`) rather than one global number, so a typical playmaking fills the same as a
+  typical rebounding. Rejected along the way: a red→amber→green heat scale ("doesn't sit well"), and a
+  `×5/n` full-five projection (flung every bar to the extremes on the first pick — killed the build).
 - **Coach labels** (`coaches.js`): derived-tilt labels now use the archetype vocabulary — scoring→
   "Up-tempo", rebounding→"Physical" (no more off-palette "Scoring"/"Rebounding" tags).
 - **Arena badges** (`app.js`): the club's 3-letter colour badge now shows beside each building in the
