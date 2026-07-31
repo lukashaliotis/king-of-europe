@@ -231,9 +231,11 @@ From a live playtest:
   for not punishing a single blind spot with a winless season.
 - **Category bars rebuilt** (`app.js catBarsHTML`, `style.css`). Were raw category sums, so playmaking
   (typical ~2.2) always looked half as full as rebounding (typical ~4.6) → felt like a permanent weak
-  link. Now each bar is shown RELATIVE TO ITS OWN TYPICAL (`CAT_TYPICAL`, now exported), centre = par,
-  with a heat colour (red = below par / weak link, amber = par, green = a strength) and a centre tick.
-  Partial rosters are projected to a full five (`×5/n`) so the scale no longer lurches on the 5th pick.
+  link. Now each bar is shown RELATIVE TO ITS OWN TYPICAL (`CAT_TYPICAL`, now exported), diverging from
+  a centre "par" tick (left = below par, right = above). Partial rosters are projected to a full five
+  (`×5/n`) so the scale no longer lurches on the 5th pick. **Colour: user reviewed a 3-way mock and
+  chose the ORIGINAL single-orange fill** (a first heat-scale version red→amber→green was rejected —
+  "doesn't sit well"); the weakest link is now called out by its highlighted LABEL only, not fill colour.
 - **Coach labels** (`coaches.js`): derived-tilt labels now use the archetype vocabulary — scoring→
   "Up-tempo", rebounding→"Physical" (no more off-palette "Scoring"/"Rebounding" tags).
 - **Arena badges** (`app.js`): the club's 3-letter colour badge now shows beside each building in the

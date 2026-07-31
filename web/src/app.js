@@ -985,15 +985,10 @@ function startReveal() {
 }
 
 // A category's standing shown RELATIVE TO ITS OWN TYPICAL LEVEL, so playmaking (typically ~2.2) and
-// rebounding (typically ~4.6) read on the same footing — the centre of every bar is "league-average
-// for that category", left of centre is a weak spot, right is a strength. Colour is a heat scale:
-// red = below par (your weak link), amber = about par, green = a real strength.
+// rebounding (typically ~4.6) read on the same footing — the centre tick of every bar is
+// "league-average for that category", left of centre is a weak spot, right is a strength. Single
+// on-brand orange fill (like the original bars); the weakest link is called out by its label alone.
 const REL_SPAN = 5; // how far above/below typical fills a full half-bar
-function heatColor(rel) {
-  const t = Math.max(0, Math.min(1, (rel + REL_SPAN) / (2 * REL_SPAN))); // 0 = deep red … 1 = green
-  const hue = t * 120; // 0 red → 60 amber (at par) → 120 green
-  return `hsl(${hue.toFixed(0)}, 70%, ${(54 - t * 6).toFixed(0)}%)`;
-}
 
 // The category bars markup, shared by the sidebar (while drafting) and the record card (final).
 // `n` is the roster size behind `res`; a partial roster is projected to a full five so the scale
@@ -1002,12 +997,11 @@ function catBarsHTML(res, n = 5) {
   const gateCat = res ? res.gateCategory : null;
   const scale = res ? 5 / Math.max(1, n) : 1;
   return CATEGORIES.map((k) => {
-    const rel = res ? res.categoryScores[k] * scale - CAT_TYPICAL[k] : -REL_SPAN;
+    const rel = res ? res.categoryScores[k] * scale - CAT_TYPICAL[k] : 0;
     const pct = Math.min(50, (Math.abs(rel) / REL_SPAN) * 50);
     const fill = rel >= 0 ? `left:50%; width:${pct}%` : `left:${50 - pct}%; width:${pct}%`;
-    const color = res ? heatColor(rel) : "var(--line)";
     return `<div class="cat-row${k === gateCat ? " isgate" : ""}"><span class="lbl">${k}</span>` +
-      `<div class="cat-track"><div class="cat-fill" style="${fill}; background:${color}"></div></div></div>`;
+      `<div class="cat-track"><div class="cat-fill" style="${fill}"></div></div></div>`;
   }).join("");
 }
 
