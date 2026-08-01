@@ -1188,6 +1188,8 @@ function shareCardData() {
     };
   });
   const ar = chosenArena();
+  const homeSlot = state.arenaSlot != null ? state.slots[state.arenaSlot] : null;
+  const homeSt = homeSlot ? clubStyle(homeSlot._src.teamCode) : null;
   return {
     modeLabel: salaryMode() ? "Salary Cap" : state.mode === "daily" ? "Daily" : "Classic",
     wins: res.wins, losses: res.losses, perfect: res.wins === GAMES,
@@ -1196,6 +1198,7 @@ function shareCardData() {
     five, coachName: co ? prettyName(co.coach.name) : "No coach", coachStyle: co ? archetypeLabel(co.coach) : "",
     salary: salaryMode() ? formatMoney(salarySpent()) : null,
     arena: ar ? ar.name : null,
+    homeColor: homeSt ? homeSt.primary : null, homeAbbr: homeSt ? homeSt.abbr : null,
   };
 }
 
@@ -1210,11 +1213,20 @@ function rr(ctx, x, y, w, h, r) {
 }
 
 // A stylized half-court (basket at TOP, matching the in-app court) drawn into the box (x,y,w,h).
-function drawCourt(ctx, x, y, w, h, line) {
+// `tint` (optional) is the home club's { color, abbr } — a soft colour wash + faint centre-court
+// abbreviation, echoing the in-app home-court treatment.
+function drawCourt(ctx, x, y, w, h, line, tint) {
   ctx.save();
   ctx.translate(x, y);
   rr(ctx, 0, 0, w, h, 18);
   ctx.save(); ctx.clip();
+  if (tint) {
+    ctx.fillStyle = tint.color; ctx.globalAlpha = 0.10; ctx.fillRect(0, 0, w, h);
+    ctx.globalAlpha = 0.14; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = '800 150px "Inter", system-ui, sans-serif';
+    ctx.fillText(tint.abbr, w / 2, h * 0.56);
+    ctx.globalAlpha = 1; ctx.textBaseline = "alphabetic";
+  }
   ctx.strokeStyle = line; ctx.lineWidth = 3;
   const mid = w / 2;
   const keyW = w * 0.28, keyH = h * 0.34;
@@ -1223,8 +1235,8 @@ function drawCourt(ctx, x, y, w, h, line) {
   ctx.beginPath(); ctx.moveTo(mid - 30, 16); ctx.lineTo(mid + 30, 16); ctx.stroke(); // backboard
   ctx.beginPath(); ctx.arc(mid, 30, 10, 0, Math.PI * 2); ctx.stroke(); // rim
   ctx.beginPath(); ctx.arc(mid, 30, w * 0.42, 0.12 * Math.PI, 0.88 * Math.PI); ctx.stroke(); // 3pt arc
-  ctx.beginPath(); ctx.arc(mid, h, w * 0.5, Math.PI * 1.16, Math.PI * 1.84); ctx.stroke(); // half-court arc
   ctx.restore();
+  rr(ctx, 0, 0, w, h, 18); ctx.strokeStyle = line; ctx.lineWidth = 2; ctx.stroke(); // court edge
   ctx.restore();
 }
 
@@ -1256,7 +1268,7 @@ function buildShareCanvas(d) {
 
   // court + five
   const cx0 = 150, cy0 = 404, cw = 780, ch = 720;
-  drawCourt(ctx, cx0, cy0, cw, ch, LINE);
+  drawCourt(ctx, cx0, cy0, cw, ch, LINE, d.homeColor ? { color: d.homeColor, abbr: d.homeAbbr } : null);
   for (const p of d.five) {
     const px = cx0 + (p.x / 100) * cw, py = cy0 + (p.y / 100) * ch, R = 44;
     ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI * 2);
@@ -1269,15 +1281,18 @@ function buildShareCanvas(d) {
     ctx.fillStyle = MUTE; ctx.font = F(600, 19); ctx.fillText(`${p.abbr} ${p.season}`, px, py + R + 58);
   }
 
-  // coach
-  ctx.fillStyle = MUTE; ctx.font = F(800, 22); ctx.fillText("COACH", cx, 1188);
+  // arena + coach
+  let by = 1172;
+  if (d.arena) { ctx.fillStyle = MUTE; ctx.font = F(700, 23); ctx.fillText(`🏟  ${d.arena}`, cx, by); by += 46; }
+  else by = 1200;
+  ctx.fillStyle = MUTE; ctx.font = F(800, 22); ctx.fillText("COACH", cx, by); by += 38;
   ctx.fillStyle = INK; ctx.font = F(700, 34);
-  ctx.fillText(d.coachStyle ? `${d.coachName}  ·  ${d.coachStyle}` : d.coachName, cx, 1230);
+  ctx.fillText(d.coachStyle ? `${d.coachName}  ·  ${d.coachStyle}` : d.coachName, cx, by);
 
   // footer
-  if (d.salary) { ctx.fillStyle = GOOD; ctx.font = F(700, 24); ctx.fillText(`Built for ${d.salary}`, cx, 1276); }
+  if (d.salary) { ctx.fillStyle = GOOD; ctx.font = F(700, 24); ctx.fillText(`Built for ${d.salary}`, cx, 1304); }
   ctx.fillStyle = ACC; ctx.font = F(700, 27);
-  ctx.fillText("king-of-europe.pages.dev", cx, d.salary ? 1312 : 1296);
+  ctx.fillText("king-of-europe.pages.dev", cx, d.salary ? 1334 : 1306);
   return cv;
 }
 

@@ -219,7 +219,9 @@ a stylized half-court with the five as club-coloured discs (monogram + surname +
 text only — no logos), the coach line (name · style), and the site link. `saveShareCard` uses the
 native share sheet where available (`navigator.canShare({files})`, mobile) and falls back to a PNG
 download. Buttons: Classic/Salary "📸 Save as image"; Daily keeps its spoiler-free text share and
-adds an opt-in "📸 Share full card (image)". Verified the render in preview.
+adds an opt-in "📸 Share full card (image)". Verified the render in preview. Follow-up (user): removed
+the bottom half-court arc, and added the home venue BOTH ways — a soft home-club colour wash + faint
+centre-court abbr on the floor, plus a "🏟 Arena" line above the coach.
 
 ## 12. Playtest batch — APPLIED
 
