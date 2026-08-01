@@ -238,7 +238,10 @@ From a live playtest:
   typical rebounding. Rejected along the way: a red→amber→green heat scale ("doesn't sit well"), and a
   `×5/n` full-five projection (flung every bar to the extremes on the first pick — killed the build).
 - **Coach labels** (`coaches.js`): derived-tilt labels now use the archetype vocabulary — scoring→
-  "Up-tempo", rebounding→"Physical" (no more off-palette "Scoring"/"Rebounding" tags).
+  "Up-tempo", rebounding→"Physical" (no more off-palette "Scoring"/"Rebounding" tags). The efficiency
+  style was later renamed **"Efficient" → "System"** (user's pick — a disciplined, half-court,
+  high-percentage coach; fits the style-noun register of the others). If the planned efficiency
+  ARCHETYPE (§2.1) is ever added, label it **System**.
 - **Arena badges** (`app.js`): the club's 3-letter colour badge now shows beside each building in the
   arena candidate list AND the spin reel.
 - **TS% display clamped** to ≤100% (`app.js boxLine`): Aleksandar Mitrovic (PAR 2009-10, 7 gp @ 2.9 mpg)

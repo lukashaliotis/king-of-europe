@@ -178,7 +178,7 @@ export function coachLabel(profile) {
   // never shows an off-palette tag like "Scoring" or "Rebounding".
   const LABELS = {
     scoring: "Up-tempo", rebounding: "Physical", playmaking: "Motion",
-    defense: "Defensive", efficiency: "Efficient",
+    defense: "Defensive", efficiency: "System",
   };
   return LABELS[profile.top];
 }
