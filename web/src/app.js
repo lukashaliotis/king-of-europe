@@ -1117,7 +1117,10 @@ function renderResult() {
         label: post.label, stage: post.stage, categoryScores: res.categoryScores,
         streak: state.dailyStreak,
       })) +
-      (state.dailyPractice ? "" : `<button id="dl-leaderboard-btn" class="ghost-btn dl-lb-btn">See today's leaderboard →</button>`);
+      (state.dailyPractice ? "" : `<button id="dl-leaderboard-btn" class="ghost-btn dl-lb-btn">See today's leaderboard →</button>`) +
+      // Daily default share stays spoiler-free (the text above); the image reveals the five, so it's
+      // opt-in — for flexing after friends have played.
+      `<button id="image-btn" class="ghost-btn dl-lb-btn">📸 Share full card (image)</button>`;
   } else if (done) {
     const grid = CATEGORIES.map((k) => catEmoji(res.categoryScores[k])).join("");
     const icon = STAGE_ICON[post.stage] ? " " + STAGE_ICON[post.stage] : "";
@@ -1125,7 +1128,7 @@ function renderResult() {
     const modeLabel = salaryMode() ? "Salary Cap" : "Classic";
     shareBlock = shareBox(
       `👑 King of Europe — ${modeLabel}\n${res.wins}–${res.losses} · ${post.label}${icon}${cap}\n${grid}\n🔗 king-of-europe.pages.dev`
-    );
+    ) + `<button id="image-btn" class="ghost-btn dl-lb-btn">📸 Save as image</button>`;
   }
   const postseasonBlock = post.rounds.length
     ? `<div class="view-toggle">` +
@@ -1164,6 +1167,141 @@ function renderResult() {
       () => { sb.textContent = "Copy failed"; }
     );
   });
+  const ib = el("image-btn");
+  if (ib) ib.addEventListener("click", () => saveShareCard(ib));
+}
+
+/* ---------------- shareable PNG card ---------------- */
+
+// Gather everything the card needs from the finished game state.
+function shareCardData() {
+  const res = projectRecord(state.slots, state.data.seasons, undefined, arenaMult(), coachCatDeltas(), state.sixth);
+  const post = runPostseason(state.slots, state.data.seasons, state.pools, res.wins, state.sixth);
+  const co = chosenCoach();
+  const five = state.slots.map((s, i) => {
+    const st = clubStyle(s._src.teamCode);
+    return {
+      x: SLOTS[i].x, y: SLOTS[i].y, slotLabel: SLOTS[i].label,
+      primary: st.primary, secondary: st.secondary, ink: textOn(st.primary),
+      mono: monogram(s.playerName), name: surname(s.playerName),
+      abbr: st.abbr, season: s._src.seasonLabel,
+    };
+  });
+  const ar = chosenArena();
+  return {
+    modeLabel: salaryMode() ? "Salary Cap" : state.mode === "daily" ? "Daily" : "Classic",
+    wins: res.wins, losses: res.losses, perfect: res.wins === GAMES,
+    stage: post.stage, label: post.label,
+    icon: STAGE_ICON[post.stage] || "",
+    five, coachName: co ? prettyName(co.coach.name) : "No coach", coachStyle: co ? archetypeLabel(co.coach) : "",
+    salary: salaryMode() ? formatMoney(salarySpent()) : null,
+    arena: ar ? ar.name : null,
+  };
+}
+
+function rr(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// A stylized half-court (basket at TOP, matching the in-app court) drawn into the box (x,y,w,h).
+function drawCourt(ctx, x, y, w, h, line) {
+  ctx.save();
+  ctx.translate(x, y);
+  rr(ctx, 0, 0, w, h, 18);
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = line; ctx.lineWidth = 3;
+  const mid = w / 2;
+  const keyW = w * 0.28, keyH = h * 0.34;
+  ctx.strokeRect(mid - keyW / 2, 0, keyW, keyH);            // paint / key
+  ctx.beginPath(); ctx.arc(mid, keyH, keyW * 0.5, 0, Math.PI * 2); ctx.stroke(); // FT circle
+  ctx.beginPath(); ctx.moveTo(mid - 30, 16); ctx.lineTo(mid + 30, 16); ctx.stroke(); // backboard
+  ctx.beginPath(); ctx.arc(mid, 30, 10, 0, Math.PI * 2); ctx.stroke(); // rim
+  ctx.beginPath(); ctx.arc(mid, 30, w * 0.42, 0.12 * Math.PI, 0.88 * Math.PI); ctx.stroke(); // 3pt arc
+  ctx.beginPath(); ctx.arc(mid, h, w * 0.5, Math.PI * 1.16, Math.PI * 1.84); ctx.stroke(); // half-court arc
+  ctx.restore();
+  ctx.restore();
+}
+
+// Render the finished team to an offscreen canvas.
+function buildShareCanvas(d) {
+  const W = 1080, H = 1350, cx = W / 2;
+  const BG = "#0e1420", PANEL = "#161d2c", LINE = "#39465c", INK = "#e7ecf3", MUTE = "#93a1b6",
+    ACC = "#ff7d1a", GOOD = "#2ecc71", GOLD = "#e6c65a";
+  const F = (wt, sz) => `${wt} ${sz}px "Inter", system-ui, -apple-system, "Segoe UI", sans-serif`;
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, "#141d2e"); grad.addColorStop(0.5, BG); grad.addColorStop(1, "#0b111b");
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = LINE; ctx.lineWidth = 2; rr(ctx, 18, 18, W - 36, H - 36, 22); ctx.stroke();
+  ctx.textAlign = "center";
+
+  // header
+  ctx.fillStyle = INK; ctx.font = F(800, 46); ctx.fillText("👑 KING OF EUROPE", cx, 96);
+  ctx.fillStyle = ACC; ctx.font = F(800, 24); ctx.fillText(d.modeLabel.toUpperCase(), cx, 134);
+
+  // record + stage
+  ctx.fillStyle = d.perfect ? GOOD : INK; ctx.font = F(800, 150);
+  ctx.fillText(`${d.wins}–${d.losses}`, cx, 300);
+  const stageCol = d.stage === "champion" ? GOLD : d.stage === "lostfinal" || d.stage === "finalfour" ? ACC : MUTE;
+  ctx.fillStyle = stageCol; ctx.font = F(700, 40);
+  ctx.fillText(`${d.label}${d.icon ? " " + d.icon : ""}`, cx, 356);
+
+  // court + five
+  const cx0 = 150, cy0 = 404, cw = 780, ch = 720;
+  drawCourt(ctx, cx0, cy0, cw, ch, LINE);
+  for (const p of d.five) {
+    const px = cx0 + (p.x / 100) * cw, py = cy0 + (p.y / 100) * ch, R = 44;
+    ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI * 2);
+    ctx.fillStyle = p.primary; ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = p.secondary; ctx.stroke();
+    ctx.fillStyle = MUTE; ctx.font = F(800, 18); ctx.fillText(p.slotLabel, px, py - R - 12);
+    ctx.fillStyle = p.ink; ctx.font = F(800, 28); ctx.textBaseline = "middle";
+    ctx.fillText(p.mono, px, py + 1); ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = F(700, 25); ctx.fillText(p.name, px, py + R + 32);
+    ctx.fillStyle = MUTE; ctx.font = F(600, 19); ctx.fillText(`${p.abbr} ${p.season}`, px, py + R + 58);
+  }
+
+  // coach
+  ctx.fillStyle = MUTE; ctx.font = F(800, 22); ctx.fillText("COACH", cx, 1188);
+  ctx.fillStyle = INK; ctx.font = F(700, 34);
+  ctx.fillText(d.coachStyle ? `${d.coachName}  ·  ${d.coachStyle}` : d.coachName, cx, 1230);
+
+  // footer
+  if (d.salary) { ctx.fillStyle = GOOD; ctx.font = F(700, 24); ctx.fillText(`Built for ${d.salary}`, cx, 1276); }
+  ctx.fillStyle = ACC; ctx.font = F(700, 27);
+  ctx.fillText("king-of-europe.pages.dev", cx, d.salary ? 1312 : 1296);
+  return cv;
+}
+
+// Build the card and hand it off: native share sheet where available (mobile), else a PNG download.
+function saveShareCard(btn) {
+  const label = btn ? btn.textContent : null;
+  const done = (msg) => { if (btn) { btn.textContent = msg; setTimeout(() => { btn.textContent = label; }, 1800); } };
+  let cv;
+  try { cv = buildShareCanvas(shareCardData()); }
+  catch (e) { done("Couldn't build image"); return; }
+  cv.toBlob((blob) => {
+    if (!blob) { done("Couldn't build image"); return; }
+    const file = new File([blob], "king-of-europe.png", { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: "King of Europe" }).then(() => done("Shared ✓")).catch(() => {});
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "king-of-europe.png";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    done("Saved ✓");
+  }, "image/png");
 }
 
 // Versus endgame: the challenger's code to share, or the responder's decided duel.

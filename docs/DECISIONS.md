@@ -213,10 +213,13 @@ two-sided matchup with both scores, winner highlighted green, losing tie edged r
 spine. A `Bracket / Summary` toggle (`state.resultView`, default `bracket`) switches to the original
 lighter round-list (`renderRounds`), which is KEPT. Verified rendering in the preview.
 
-**Still QUEUED (frontend, this pass):**
-- **Court-card share (PNG).** Classic/Salary: a rendered downloadable IMAGE (court + five by position
-  + coach + record + round of elimination; text names only, no logos). Daily: default share stays
-  **spoiler-free** (record + round only) with an **option to share the full card**. User picked PNG image.
+**Court-card share (PNG) — APPLIED** (`app.js`: `buildShareCanvas`/`drawCourt`/`shareCardData`/
+`saveShareCard`). A 1080×1350 canvas card: header, big record + stage (gold trophy for champions),
+a stylized half-court with the five as club-coloured discs (monogram + surname + club abbr/season,
+text only — no logos), the coach line (name · style), and the site link. `saveShareCard` uses the
+native share sheet where available (`navigator.canShare({files})`, mobile) and falls back to a PNG
+download. Buttons: Classic/Salary "📸 Save as image"; Daily keeps its spoiler-free text share and
+adds an opt-in "📸 Share full card (image)". Verified the render in preview.
 
 ## 12. Playtest batch — APPLIED
 
