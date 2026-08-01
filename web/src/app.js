@@ -984,21 +984,27 @@ function startReveal() {
   }, 1050);
 }
 
-// The category bars GROW as you draft (each shows the running total, from empty at the first pick
-// to full at the fifth — the gradual build). The un-skew: each category is divided by ITS OWN
-// typical (not one global number), so a typical playmaking (~2.2) fills the same as a typical
-// rebounding (~4.6) instead of looking permanently half-empty. A category at ~2x its typical fills
-// the bar. Single on-brand orange; the weakest link is called out by its highlighted label.
-const CAT_SPAN = 2.0; // a category at CAT_SPAN× its typical level fills the half-bar
+// The category bars GROW as you draft (each shows the running total, so they ADD UP toward the
+// finished five's aggregate). Two shaping choices:
+//  - each category is divided by ITS OWN typical (`CAT_TYPICAL`), so a typical playmaking (~2.2)
+//    fills the same as a typical rebounding (~4.6) instead of looking permanently half-empty;
+//  - a convex build curve (`BAR_CURVE` > 1) means one player — even a star whose single-category
+//    score can rival a whole five — only nudges the bar; it fills in as the picks stack up, rather
+//    than jumping to the end on the first pick.
+// Single on-brand orange; the weakest link is called out by its highlighted label.
+const CAT_SPAN = 2.2;   // a category at ~this× its typical level fills the half-bar
+const BAR_CURVE = 1.35; // >1 → early/small totals barely move the bar (gradual build-up)
+function catBarGeom(score, k) {
+  const ratio = Math.min(1, Math.abs(score) / (CAT_TYPICAL[k] * CAT_SPAN));
+  const width = 50 * Math.pow(ratio, BAR_CURVE);
+  return { left: score >= 0 ? 50 : 50 - width, width };
+}
 function catBarsHTML(res) {
   const gateCat = res ? res.gateCategory : null;
   return CATEGORIES.map((k) => {
-    const score = res ? res.categoryScores[k] : 0;        // running total — builds as you draft
-    const norm = score / (CAT_TYPICAL[k] * CAT_SPAN);     // ÷ this category's typical: unskews it
-    const pct = Math.min(50, Math.abs(norm) * 50);
-    const fill = norm >= 0 ? `left:50%; width:${pct}%` : `left:${50 - pct}%; width:${pct}%`;
+    const g = catBarGeom(res ? res.categoryScores[k] : 0, k);
     return `<div class="cat-row${k === gateCat ? " isgate" : ""}"><span class="lbl">${k}</span>` +
-      `<div class="cat-track"><div class="cat-fill" style="${fill}"></div></div></div>`;
+      `<div class="cat-track"><div class="cat-fill" style="left:${g.left}%; width:${g.width}%"></div></div></div>`;
   }).join("");
 }
 
@@ -1016,11 +1022,9 @@ function updateCatBars(container, res) {
   for (const k of CATEGORIES) {
     const row = container.querySelector(`.cat-row[data-cat="${k}"]`);
     const fill = row.querySelector(".cat-fill");
-    const score = res ? res.categoryScores[k] : 0;
-    const norm = score / (CAT_TYPICAL[k] * CAT_SPAN);
-    const pct = Math.min(50, Math.abs(norm) * 50);
-    fill.style.left = (norm >= 0 ? 50 : 50 - pct) + "%";
-    fill.style.width = pct + "%";
+    const g = catBarGeom(res ? res.categoryScores[k] : 0, k);
+    fill.style.left = g.left + "%";
+    fill.style.width = g.width + "%";
     row.classList.toggle("isgate", k === gateCat);
   }
 }
