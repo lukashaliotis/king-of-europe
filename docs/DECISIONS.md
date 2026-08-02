@@ -255,6 +255,24 @@ From a live playtest:
 - **Non-issue:** "Elan Chalonnais 2012-13 Jean-Baptiste-Adolphe" — real player (Michel
   Jean-Baptiste-Adolphe, the hyphenated part is the surname). No change.
 
+## 13. Result-screen + share polish — APPLIED
+
+- **Share image → clipboard-first** (`app.js copyShareCard`). Button is now "📋 Copy image" (Daily:
+  "📋 Copy full card"); primary action copies the PNG to the clipboard via `ClipboardItem`, falling
+  back to the native share sheet then a download. A `sharingCard` guard stops the double-fire that
+  produced two copies/downloads.
+- **Sequential reveal** (`startReveal`, `renderBracket`, `renderRounds`). Reveal order is now
+  record → seeding → each round in turn → verdict (revealStage: 0 record, 1 seeding, 2+ rounds; total
+  = rounds+1). The summary view gained a matching "Seed" line.
+- **Bracket fits one screen** (`renderControl` hides `#control-bar` once revealed — the dead spin bar
+  was eating ~46px above the record; plus compacted result-card/bracket CSS). Common (3-tie) champions
+  now fit without scrolling; the rare 4-tie play-in champion still needs a taller screen.
+- **Coach count** (`coaches.js`, `app.js`, `resolve.js`): capital "Coached", and now over ALL SIX
+  (starters + sixth man) — callers pass six and `coachDeltas` share is `count/6`. Difficulty re-checked
+  (skilled median 29, 38-0 3.5% — unchanged; the greedy now also picks a sixth that helps the coach).
+- **In-app court** (`index.html`): removed the bottom half-court arc — its ends read as two odd
+  diagonal lines in the bottom corners (same arc already dropped from the PNG card).
+
 ## Rejected approaches (don't re-litigate without new data)
 
 - **Auto-deriving coach archetypes from box scores — REJECTED (twice).** Player box scores track the

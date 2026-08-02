@@ -197,10 +197,11 @@ export function eligibleCoaches(five, data) {
 /**
  * Category deltas, SCALED BY ROSTER SHARE — he can only coach the players he actually had.
  * Same fix the arena needed: with five clubs, "best of your five" is otherwise a free bonus.
- * It also makes the SPEC's brag ("Obradović coached 3 of your 5") mechanically real.
+ * It also makes the SPEC's brag ("Obradović coached 3 of your 5") mechanically real. Share is over
+ * the FULL SIX-man roster (five starters + the sixth man), so callers pass all six.
  */
 export function coachDeltas(entry) {
-  const share = entry.count / 5;
+  const share = entry.count / 6;
   const ped = entry.coach.pedigree || 1; // scales the whole vector, negatives included
   const out = {};
   const a = entry.coach.archetype;

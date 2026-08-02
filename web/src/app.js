@@ -383,7 +383,7 @@ function arenaInfoFor(slotIdx) {
 }
 const chosenArena = () => (state.arenaSlot !== null ? arenaInfoFor(state.arenaSlot) : null);
 const arenaMult = () => { const a = chosenArena(); return a ? a.mult : 1; };
-const coachOptions = () => eligibleCoaches(filled(), state.data);
+const coachOptions = () => eligibleCoaches([...filled(), state.sixth].filter(Boolean), state.data);
 const chosenCoach = () => (state.coachName ? coachOptions().find((e) => e.coach.name === state.coachName) || null : null);
 const coachCatDeltas = () => { const c = chosenCoach(); return c ? coachDeltas(c) : null; };
 
@@ -586,6 +586,9 @@ function renderSixth() {
 
 function renderControl() {
   const done = complete();
+  // Once the season is revealed the spin bar is dead weight — hide it so the result/bracket claims
+  // that vertical space and fits without scrolling.
+  el("control-bar").classList.toggle("hidden", done && state.revealed);
   const info = el("pickinfo");
   if (done) info.textContent = state.revealed ? "Season played" : "Your team is set";
   else info.innerHTML = `Pick <b>${pickedCount() + 1}</b> of 6`; // 5 starters + 1 bench, any order
@@ -637,7 +640,7 @@ function renderBench() {
   // "N of your 5" count to save vertical room — it's already shown on the coach-pick cards.
   const meta = state.revealed
     ? `<div class="bench-meta">${archetypeLabel(co.coach)}</div>`
-    : `<div class="bench-meta">${archetypeLabel(co.coach)} · ${co.count} of your 5</div>`;
+    : `<div class="bench-meta">${archetypeLabel(co.coach)} · Coached ${co.count} of your 6</div>`;
   box.innerHTML =
     `<div class="bench-line"><span class="bench-tag">Coach</span>` +
     `<span class="venue-name">${prettyName(co.coach.name)}</span></div>` + meta;
@@ -848,7 +851,7 @@ function renderCommit() {
   const cards = opts.map((e) => {
     const ped = pedigreeLabel(e.coach);
     const pedTag = ped ? `<span class="cc-ped">${ped}</span>` : "";
-    return card(e.coach.name, `${archetypeLabel(e.coach)}${pedTag} · coached ${e.count} of your 5`);
+    return card(e.coach.name, `${archetypeLabel(e.coach)}${pedTag} · Coached ${e.count} of your 6`);
   }).join("");
 
   const playLabel = state.mode === "versus"
@@ -975,7 +978,9 @@ function startReveal() {
   render();
   const post = runPostseason(state.slots, state.data.seasons, state.pools,
     projectRecord(state.slots, state.data.seasons, undefined, arenaMult(), coachCatDeltas(), state.sixth).wins, state.sixth);
-  const total = post.rounds.length;
+  // Reveal order: record (stage 0) → seeding (stage 1) → each round in turn → verdict. The extra
+  // +1 step is the seeding, so a bracket with N rounds has N+1 reveal steps.
+  const total = post.rounds.length ? post.rounds.length + 1 : 0;
   clearInterval(revealTimer);
   revealTimer = setInterval(() => {
     state.revealStage++;
@@ -1040,18 +1045,24 @@ function renderCats() {
   el("gate-note").textContent = res && picks.length >= 2 ? `Weakest link: ${res.gateCategory}` : "";
 }
 
-// Only the first `shown` rounds, each animating in as it appears.
-function renderRounds(post, shown) {
-  const rounds = post.rounds.slice(0, shown);
-  if (!rounds.length) return "";
-  return `<div class="rounds">` + rounds.map((r) => {
+// The summary list, revealed one step at a time: seeding first (shown ≥ 1), then each round.
+function renderRounds(post, res, shown) {
+  if (shown < 1) return "";
+  const seed = seedFor(res.wins);
+  const entryNote = res.wins >= 24 ? "Straight into the playoffs"
+    : res.wins >= 20 ? "Into the play-in" : "Missed the postseason";
+  const seedLine =
+    `<div class="round seed pop"><span class="rname">Seed</span>` +
+    `<span class="rbody">${seed ? ordinal(seed) + " seed" : "—"} · ${entryNote}</span></div>`;
+  const rounds = post.rounds.slice(0, Math.max(0, shown - 1)).map((r) => {
     const verb = r.win ? "beat" : "lost to";
     const score = r.series ? r.series : `${r.us}–${r.them}`;
     return `<div class="round ${r.win ? "won" : "out"} pop">` +
       `<span class="rname">${r.name}</span>` +
       `<span class="rbody">${verb} <b>${clubStyle(r.opp.teamCode).abbr} ${r.opp.seasonLabel}</b> ` +
       `<span class="rscore">${score}</span></span></div>`;
-  }).join("") + `</div>`;
+  }).join("");
+  return `<div class="rounds">${seedLine}${rounds}</div>`;
 }
 
 // Where a record slots you in the standings (flavour, deterministic from wins): 1–6 go straight to
@@ -1069,13 +1080,15 @@ function renderBracket(post, res, shown) {
   const seed = seedFor(res.wins);
   const entryNote = res.wins >= 24 ? "Straight into the playoffs"
     : res.wins >= 20 ? "Into the play-in" : "Missed the postseason";
-  const entry =
-    `<div class="bk-entry pop">` +
-      (seed ? `<span class="bk-seed">${ordinal(seed)} seed</span>` : `<span class="bk-seed miss">—</span>`) +
-      `<span class="bk-entry-note">${entryNote}</span>` +
-    `</div>`;
+  // shown: 0 = nothing yet, 1 = seeding, 2 = +round 1, … (record is revealed separately, above).
+  const entry = shown >= 1
+    ? `<div class="bk-entry pop">` +
+        (seed ? `<span class="bk-seed">${ordinal(seed)} seed</span>` : `<span class="bk-seed miss">—</span>`) +
+        `<span class="bk-entry-note">${entryNote}</span>` +
+      `</div>`
+    : "";
 
-  const rounds = post.rounds.slice(0, shown).map((r) => {
+  const rounds = post.rounds.slice(0, Math.max(0, shown - 1)).map((r) => {
     const tally = r.series ? r.series.split(/[^\d]+/) : null; // "3–1" → ["3","1"], dash-agnostic
     const you = tally ? tally[0] : r.us;
     const opp = tally ? tally[1] : r.them;
@@ -1101,7 +1114,7 @@ function renderResult() {
   const res = projectRecord(state.slots, state.data.seasons, undefined, arenaMult(), coachCatDeltas(), state.sixth);
   const perfect = res.wins === GAMES;
   const post = runPostseason(state.slots, state.data.seasons, state.pools, res.wins, state.sixth);
-  const total = post.rounds.length;
+  const total = post.rounds.length ? post.rounds.length + 1 : 0; // +1 = the seeding step
   const done = state.revealStage > total; // all rounds shown -> reveal the verdict + brag
   card.classList.remove("hidden");
   // A copy-able result on EVERY mode. Daily keeps its dated/streak card + leaderboard link; Classic
@@ -1120,7 +1133,7 @@ function renderResult() {
       (state.dailyPractice ? "" : `<button id="dl-leaderboard-btn" class="ghost-btn dl-lb-btn">See today's leaderboard →</button>`) +
       // Daily default share stays spoiler-free (the text above); the image reveals the five, so it's
       // opt-in — for flexing after friends have played.
-      `<button id="image-btn" class="ghost-btn dl-lb-btn">📸 Share full card (image)</button>`;
+      `<button id="image-btn" class="ghost-btn dl-lb-btn">📋 Copy full card (image)</button>`;
   } else if (done) {
     const grid = CATEGORIES.map((k) => catEmoji(res.categoryScores[k])).join("");
     const icon = STAGE_ICON[post.stage] ? " " + STAGE_ICON[post.stage] : "";
@@ -1128,7 +1141,7 @@ function renderResult() {
     const modeLabel = salaryMode() ? "Salary Cap" : "Classic";
     shareBlock = shareBox(
       `👑 King of Europe — ${modeLabel}\n${res.wins}–${res.losses} · ${post.label}${icon}${cap}\n${grid}\n🔗 king-of-europe.pages.dev`
-    ) + `<button id="image-btn" class="ghost-btn dl-lb-btn">📸 Save as image</button>`;
+    ) + `<button id="image-btn" class="ghost-btn dl-lb-btn">📋 Copy image</button>`;
   }
   const postseasonBlock = post.rounds.length
     ? `<div class="view-toggle">` +
@@ -1136,7 +1149,7 @@ function renderResult() {
         `<button class="vt-btn${state.resultView === "summary" ? " on" : ""}" data-view="summary">Summary</button>` +
       `</div>` +
       (state.resultView === "summary"
-        ? renderRounds(post, state.revealStage)
+        ? renderRounds(post, res, state.revealStage)
         : renderBracket(post, res, state.revealStage))
     : "";
   card.innerHTML =
@@ -1168,7 +1181,7 @@ function renderResult() {
     );
   });
   const ib = el("image-btn");
-  if (ib) ib.addEventListener("click", () => saveShareCard(ib));
+  if (ib) ib.addEventListener("click", () => copyShareCard(ib));
 }
 
 /* ---------------- shareable PNG card ---------------- */
@@ -1296,27 +1309,42 @@ function buildShareCanvas(d) {
   return cv;
 }
 
-// Build the card and hand it off: native share sheet where available (mobile), else a PNG download.
-function saveShareCard(btn) {
-  const label = btn ? btn.textContent : null;
-  const done = (msg) => { if (btn) { btn.textContent = msg; setTimeout(() => { btn.textContent = label; }, 1800); } };
+// Build the card and COPY it to the clipboard (so it pastes straight into a chat) — the primary
+// action. Falls back to the native share sheet, then a download, if image-clipboard isn't supported.
+// A guard prevents a double-tap (or a re-render re-attaching the handler) from firing it twice.
+let sharingCard = false;
+function copyShareCard(btn) {
+  if (sharingCard) return;
+  sharingCard = true;
+  const label = btn ? btn.textContent : "";
+  const reset = () => { sharingCard = false; if (btn) btn.textContent = label; };
+  const flash = (msg) => { if (btn) { btn.textContent = msg; setTimeout(reset, 1800); } else sharingCard = false; };
   let cv;
   try { cv = buildShareCanvas(shareCardData()); }
-  catch (e) { done("Couldn't build image"); return; }
+  catch (e) { flash("Couldn't build"); return; }
   cv.toBlob((blob) => {
-    if (!blob) { done("Couldn't build image"); return; }
-    const file = new File([blob], "king-of-europe.png", { type: "image/png" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: "King of Europe" }).then(() => done("Shared ✓")).catch(() => {});
+    if (!blob) { flash("Couldn't build"); return; }
+    if (navigator.clipboard && window.ClipboardItem) {
+      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+        .then(() => flash("Copied ✓"))
+        .catch(() => shareOrDownloadCard(blob, flash, reset));
       return;
     }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "king-of-europe.png";
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
-    done("Saved ✓");
+    shareOrDownloadCard(blob, flash, reset);
   }, "image/png");
+}
+function shareOrDownloadCard(blob, flash, reset) {
+  const file = new File([blob], "king-of-europe.png", { type: "image/png" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: "King of Europe" }).then(() => flash("Shared ✓")).catch(reset);
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "king-of-europe.png";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+  flash("Saved ✓");
 }
 
 // Versus endgame: the challenger's code to share, or the responder's decided duel.

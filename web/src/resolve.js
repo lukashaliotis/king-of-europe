@@ -88,7 +88,7 @@ export function resolveDaily(data, dayKey, submission) {
   // Coach — the one genuine choice. Must have coached at least one of the five.
   let catDeltas = null, coachName = null;
   if (coachCode) {
-    const entry = eligibleCoaches(starters, data).find((e) => e.coach.code === coachCode);
+    const entry = eligibleCoaches([...starters, sixth].filter(Boolean), data).find((e) => e.coach.code === coachCode);
     if (!entry) return fail("that coach managed none of your five");
     catDeltas = coachDeltas(entry);
     coachName = entry.coach.name;
