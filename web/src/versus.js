@@ -6,44 +6,40 @@ import { projectRecord, playerStrength, gameProbability } from "./engine.js";
 import { arenaFor } from "./arenas.js";
 import { eligibleCoaches, coachDeltas } from "./coaches.js";
 import { mulberry32, hashSeed } from "./daily.js";
-import { legendsPool } from "./legends.js";
 
-const PREFIX = "KOE-V1-";
-
-// unicode-safe base64 (coach names carry accents: Obradović, Jasikevičius…)
-const b64 = (s) => btoa(unescape(encodeURIComponent(s)));
-const unb64 = (s) => decodeURIComponent(escape(atob(s)));
+const PREFIX = "KOE2-";
 
 /* ---------------- serialize / encode ---------------- */
 
-// Build the compact envelope from the finished game state. Players are stored as
-// [playerCode, season, teamCode] triples and looked up again on the other side.
-export function serializeTeam({ seed, slots, sixth, arena, coachName }) {
-  const trip = (p) => [p.playerCode, p.season, p._src.teamCode];
-  return {
-    v: 1,
-    seed,
-    five: slots.map(trip),
-    bench: sixth ? trip(sixth) : 0,
-    arena: arena ? [arena.teamCode, arena.season] : 0, // [teamCode, season] whose building hosts
-    coach: coachName || 0,
-  };
-}
-
-export function encodeChallenge(envelope) {
-  return PREFIX + b64(JSON.stringify(envelope));
+// The challenge is SHORT because both players share the same seeded six-draw board (rebuilt from the
+// seed on the other side). So we don't store full player rows — just, per draw, the CODE of the
+// player picked from it; season and club are implied by the draw. Plus the seed (base36), which draw
+// is the bench, which draw's club hosts the arena, and the coach's short code. All ASCII, readable,
+// and about a quarter the length of the old base64 envelope. Fields split on ".", codes on ",".
+export function encodeChallenge({ seed, board, slots, sixth, arenaSlotIdx, coachCode }) {
+  const all = [...slots, sixth].filter(Boolean);
+  const used = new Set();
+  // for each draw (in order), the code of the drafted player that came from it
+  const codes = board.map((draw) => {
+    const p = all.find((x) => !used.has(x.playerCode) && draw.players.some((pl) => pl.playerCode === x.playerCode));
+    if (p) used.add(p.playerCode);
+    return p ? p.playerCode : "";
+  });
+  const benchIdx = sixth ? codes.indexOf(sixth.playerCode) : -1;
+  const arenaIdx = (arenaSlotIdx != null && slots[arenaSlotIdx]) ? codes.indexOf(slots[arenaSlotIdx].playerCode) : -1;
+  return PREFIX + [seed.toString(36), codes.join(","), benchIdx, arenaIdx, coachCode || ""].join(".");
 }
 
 export function decodeChallenge(code) {
   const raw = String(code || "").trim();
   if (!raw.startsWith(PREFIX)) throw new Error("That doesn't look like a King of Europe challenge code.");
-  let env;
-  try { env = JSON.parse(unb64(raw.slice(PREFIX.length))); }
-  catch (e) { throw new Error("This challenge code is corrupted."); }
-  if (!env || env.v !== 1 || !Array.isArray(env.five) || env.five.length !== 5) {
-    throw new Error("This challenge code is not valid.");
-  }
-  return env;
+  const parts = raw.slice(PREFIX.length).split(".");
+  if (parts.length < 5) throw new Error("This challenge code is corrupted.");
+  const [seed36, codesStr, benchIdx, arenaIdx, coachCode] = parts;
+  const codes = codesStr.split(",");
+  const seed = parseInt(seed36, 36);
+  if (!Number.isFinite(seed) || codes.length !== 6) throw new Error("This challenge code is not valid.");
+  return { seed: seed >>> 0, codes, benchIdx: Number(benchIdx), arenaIdx: Number(arenaIdx), coachCode: coachCode || "" };
 }
 
 /* ---------------- reconstruct the opponent ---------------- */
@@ -53,43 +49,39 @@ function prettySurname(name) {
   return s.replace(/\b([a-zà-ÿ])/g, (m) => m.toUpperCase());
 }
 
-function findPlayer(data, [code, season, team]) {
-  // European Legends live in their own pool, not the baked players list.
-  if (team === "LEG") return legendsPool().players.find((p) => p.playerCode === code) || null;
-  return data.players.find((p) => p.playerCode === code && p.season === season && p.teamCode === team) || null;
-}
 function withSrc(rec, data) {
   return { ...rec, _src: { teamCode: rec.teamCode, teamName: rec.teamName, seasonLabel: data.seasons[String(rec.season)].label } };
 }
 
-// Turn a decoded envelope into a playable opponent: the reconstructed five/bench, the arena
-// multiplier and coach deltas they chose, a display label, and the projected result (for the
-// duel's strength). Throws if any player can't be found in this build's data.
-export function reconstructTeam(env, data) {
-  const starters = env.five.map((t) => {
-    const rec = findPlayer(data, t);
+// Turn a decoded envelope into a playable opponent, using the SAME six-draw `board` (rebuilt from the
+// seed) both players share: each stored code is looked up in its draw. Returns the reconstructed
+// five/bench, the arena multiplier and coach deltas they chose, a display label, and the projected
+// result. Throws if a code can't be found in this build's board (different game data).
+export function reconstructTeam(env, data, board) {
+  const players = env.codes.map((code, i) => {
+    const draw = board[i];
+    const rec = draw && draw.players.find((pl) => pl.playerCode === code);
     if (!rec) throw new Error("This challenge was built from different game data.");
     return withSrc(rec, data);
   });
-  const bench = env.bench ? (() => {
-    const rec = findPlayer(data, env.bench);
-    return rec ? withSrc(rec, data) : null;
-  })() : null;
+  const bench = env.benchIdx >= 0 ? players[env.benchIdx] : null;
+  const starters = players.filter((_, i) => i !== env.benchIdx);
+  if (starters.length !== 5) throw new Error("This challenge code is not valid.");
 
   // arena multiplier — same roster-share scaling the live game uses
   let arenaMult = 1, arenaName = null;
-  if (env.arena) {
-    const [team, season] = env.arena;
-    const base = arenaFor(team, season);
-    const share = starters.filter((s) => s._src.teamCode === team).length / 5;
+  if (env.arenaIdx >= 0 && players[env.arenaIdx]) {
+    const host = players[env.arenaIdx];
+    const base = arenaFor(host._src.teamCode, host.season);
+    const share = starters.filter((s) => s._src.teamCode === host._src.teamCode).length / 5;
     arenaMult = 1 + (base.mult - 1) * share;
     arenaName = base.name;
   }
 
-  // coach deltas — find the named coach among those who managed this five
+  // coach deltas — find the coach (by code) among those who managed the six
   let deltas = null, coachName = null;
-  if (env.coach) {
-    const entry = eligibleCoaches(starters, data).find((e) => e.coach.name === env.coach);
+  if (env.coachCode) {
+    const entry = eligibleCoaches([...starters, bench].filter(Boolean), data).find((e) => e.coach.code === env.coachCode);
     if (entry) { deltas = coachDeltas(entry); coachName = entry.coach.name; }
   }
 

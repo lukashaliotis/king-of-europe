@@ -273,6 +273,19 @@ From a live playtest:
 - **In-app court** (`index.html`): removed the bottom half-court arc — its ends read as two odd
   diagonal lines in the bottom corners (same arc already dropped from the PNG card).
 
+## 14. Versus challenge code — shortened + box fit — APPLIED
+
+The old code was a ~200-char base64 JSON blob (`KOE-V1-…`) that overflowed its box. Rewritten
+(`web/src/versus.js`, prefix `KOE2-`): since both players share the same seeded six-draw board, picks
+are stored BY REFERENCE to the board — just the player CODE per draw (season/club implied), plus the
+base36 seed, the bench draw index, the arena draw index, and the coach's short code. No base64 (all
+ASCII, readable). ~65 chars, e.g. `KOE2-msak5.ATP,003469,002100,001413,008811,LEG_SABONIS.5.0.001869`.
+`reconstructTeam(env, data, board)` now takes the shared board (built from the seed before reconstruct
+in `versusAccept`) and looks each code up in its draw; coach matched by CODE; arena from the host
+draw. Round-trip verified 40/40 seeds incl. legend boards. Box fit: `.share-pre` got
+`overflow-wrap: anywhere` so any code wraps instead of overflowing. Old `KOE-V1-` codes no longer
+decode (ephemeral, acceptable).
+
 ## Rejected approaches (don't re-litigate without new data)
 
 - **Auto-deriving coach archetypes from box scores — REJECTED (twice).** Player box scores track the

@@ -11,7 +11,7 @@ import {
 } from "./daily.js";
 import { initOnboarding } from "./onboarding.js";
 import {
-  serializeTeam, encodeChallenge, decodeChallenge, reconstructTeam, duel, duelSeed,
+  encodeChallenge, decodeChallenge, reconstructTeam, duel, duelSeed,
 } from "./versus.js";
 import { SALARY_CAP, FLOOR as SALARY_FLOOR, playerCost, canAfford, formatMoney } from "./salary.js";
 import { getIdentity, saveName, submitDaily, fetchLeaderboard } from "./leaderboard.js";
@@ -170,11 +170,11 @@ function versusCreate() {
 function versusAccept(code) {
   try {
     const env = decodeChallenge(code);
-    state.versusOpponent = reconstructTeam(env, state.data);
     state.versusSeed = env.seed >>> 0;
+    buildVersusBoard(); // rebuild the shared board first — the code's picks reference it
+    state.versusOpponent = reconstructTeam(env, state.data, state.versusBoard);
     state.versusRole = "accept";
     state.versusError = null;
-    buildVersusBoard();
     reset();
   } catch (e) {
     state.versusError = e.message;
@@ -183,15 +183,15 @@ function versusAccept(code) {
 }
 // The challenger's finished five -> a shareable code.
 function makeChallengeCode() {
-  const arenaTeam = state.arenaSlot !== null ? state.slots[state.arenaSlot] : null;
-  const env = serializeTeam({
+  const co = chosenCoach();
+  return encodeChallenge({
     seed: state.versusSeed,
+    board: state.versusBoard,
     slots: state.slots,
     sixth: state.sixth,
-    arena: arenaTeam ? { teamCode: arenaTeam._src.teamCode, season: arenaTeam.season } : null,
-    coachName: state.coachName,
+    arenaSlotIdx: state.arenaSlot,
+    coachCode: co ? co.coach.code : "",
   });
-  return encodeChallenge(env);
 }
 // The responder's five vs the reconstructed challenger -> a best-of-seven.
 function runDuel() {
