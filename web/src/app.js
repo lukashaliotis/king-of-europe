@@ -7,7 +7,7 @@ import { eligibleCoaches, coachDeltas, archetypeLabel, pedigreeLabel } from "./c
 import { legendsPool, LEGENDS_CHANCE } from "./legends.js";
 import {
   mulberry32, hashSeed, utcDayKey, dailySeed, buildDailyBoard, rosterSignature,
-  shareText, catEmoji, STAGE_ICON, loadDaily, saveDaily, currentStreak, dailyHistory,
+  shareText, weakestLink, STAGE_ICON, loadDaily, saveDaily, currentStreak, dailyHistory,
 } from "./daily.js";
 import { initOnboarding } from "./onboarding.js";
 import {
@@ -1141,12 +1141,12 @@ function renderResult() {
       // opt-in — for flexing after friends have played.
       `<button id="image-btn" class="ghost-btn dl-lb-btn">📋 Copy full card (image)</button>`;
   } else if (done) {
-    const grid = CATEGORIES.map((k) => catEmoji(res.categoryScores[k])).join("");
     const icon = STAGE_ICON[post.stage] ? " " + STAGE_ICON[post.stage] : "";
     const cap = salaryMode() ? ` · ${formatMoney(salarySpent())}` : "";
     const modeLabel = salaryMode() ? "Salary Cap" : "Classic";
+    const weak = post.stage === "champion" ? "" : `\nWeak link: ${weakestLink(res.categoryScores)}`;
     shareBlock = shareBox(
-      `👑 King of Europe — ${modeLabel}\n${res.wins}–${res.losses} · ${post.label}${icon}${cap}\n${grid}\n🔗 king-of-europe.pages.dev`
+      `👑 King of Europe — ${modeLabel}\n${res.wins}–${res.losses} · ${post.label}${icon}${cap}${weak}\n🔗 king-of-europe.pages.dev`
     ) + `<button id="image-btn" class="ghost-btn dl-lb-btn">📋 Copy image</button>` +
       `<button id="play-again" class="ghost-btn dl-lb-btn">↻ Play again</button>`;
   }

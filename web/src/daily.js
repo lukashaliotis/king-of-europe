@@ -2,7 +2,7 @@
 // faces the SAME six club-year draws on a given day and results are directly comparable
 // (Wordle-style). No re-spins: the board is the challenge. Shared, reproducible, shareable.
 import { spin } from "./data.js";
-import { CATEGORIES, projectRecord, playerStrength, DEFAULT_PARAMS } from "./engine.js";
+import { CATEGORIES, CAT_TYPICAL, projectRecord, playerStrength, DEFAULT_PARAMS } from "./engine.js";
 
 // Small, fast, seedable PRNG (same generator the Node tuning harness uses).
 export function mulberry32(a) {
@@ -150,13 +150,23 @@ export function catEmoji(score) {
 }
 export const STAGE_ICON = { champion: "🏆", lostfinal: "🥈", finalfour: "🎯" };
 
-// The spoiler-light share string: record, stage, and a five-square category grid (the red
-// square is your weakest link — the gate).
+// The weakest CATEGORY relative to its typical level (same gate the engine uses), title-cased.
+export function weakestLink(categoryScores) {
+  let worst = CATEGORIES[0], wv = Infinity;
+  for (const k of CATEGORIES) {
+    const rel = categoryScores[k] - CAT_TYPICAL[k];
+    if (rel < wv) { wv = rel; worst = k; }
+  }
+  return worst.charAt(0).toUpperCase() + worst.slice(1);
+}
+
+// The share string: record, stage, and — unless you won it all — the weakest link named in words
+// (the old colour grid read as gibberish without a legend; the PNG card carries the full detail).
 export function shareText({ dayKey, wins, losses, label, stage, categoryScores, streak }) {
-  const grid = CATEGORIES.map((k) => catEmoji(categoryScores[k])).join("");
   const pretty = new Date(dayKey + "T00:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short" });
   const icon = STAGE_ICON[stage] ? " " + STAGE_ICON[stage] : "";
-  return `👑 King of Europe — Daily\n${pretty} · ${wins}–${losses} · ${label}${icon}\n${grid}` +
+  const weak = stage === "champion" ? "" : `\nWeak link: ${weakestLink(categoryScores)}`;
+  return `👑 King of Europe — Daily\n${pretty} · ${wins}–${losses} · ${label}${icon}${weak}` +
     (streak > 1 ? `\n🔥 ${streak}-day streak` : "") +
     `\n🔗 king-of-europe.pages.dev`;
 }
