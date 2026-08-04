@@ -449,6 +449,9 @@ function spinArena() {
 function render() {
   // drives the result-screen sidebar re-order (coach up, balance hidden) via CSS
   document.body.dataset.revealed = complete() && state.revealed ? "1" : "";
+  // the coach-pick step (five done, arena spun, not yet revealed): group arena + coach up top too,
+  // so the coach you're choosing isn't stranded at the bottom of the sidebar.
+  document.body.dataset.picking = complete() && state.arenaSpun && !state.revealed ? "1" : "";
   renderModes(); renderControl(); renderVenue(); renderCourt(); renderSixth(); renderBench();
   renderOffer(); renderCommit(); renderCats(); renderResult();
 }
@@ -747,10 +750,10 @@ function renderOffer() {
   box.style.setProperty("--team", s.primary);
 
   box.innerHTML =
-    (pool.legend ? `<div class="legends-banner">★ EUROPEAN LEGENDS ★ <span>a rare nugget — pick an all-time great</span></div>` : "") +
+    (pool.legend ? `<div class="legends-banner">★ EUROPEAN LEGENDS ★</div>` : "") +
     `<div class="offer-head" style="border-color:${s.primary}">` + badge(pool.teamCode) +
       `<div><div class="club">${pool.teamName} <span class="season">${pool.seasonLabel}</span></div>` +
-      `<div class="sub">${pool.players.length} players${pool.legend ? " · estimated stats" : ""}</div></div>` +
+      `<div class="sub">${pool.players.length} players${pool.legend ? " · Estimated Stats" : ""}</div></div>` +
     `</div>` +
     `<div class="pool-tools"><label class="sort-lbl">Sort <select id="sort-sel">${sortSel}</select></label>` +
     `<div class="pos-filter">${posBtns}</div></div>` +
@@ -950,7 +953,10 @@ function wireNameForm(box) {
     mountLeaderboard();
   };
   if (save) save.addEventListener("click", commit);
-  if (input) input.addEventListener("keydown", (e) => { if (e.key === "Enter") commit(); });
+  if (input) {
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") commit(); });
+    input.focus({ preventScroll: true }); // put the cursor in the field so the action is obvious
+  }
 }
 
 function leaderboardHTML(data, id) {
@@ -1141,7 +1147,8 @@ function renderResult() {
     const modeLabel = salaryMode() ? "Salary Cap" : "Classic";
     shareBlock = shareBox(
       `👑 King of Europe — ${modeLabel}\n${res.wins}–${res.losses} · ${post.label}${icon}${cap}\n${grid}\n🔗 king-of-europe.pages.dev`
-    ) + `<button id="image-btn" class="ghost-btn dl-lb-btn">📋 Copy image</button>`;
+    ) + `<button id="image-btn" class="ghost-btn dl-lb-btn">📋 Copy image</button>` +
+      `<button id="play-again" class="ghost-btn dl-lb-btn">↻ Play again</button>`;
   }
   const postseasonBlock = post.rounds.length
     ? `<div class="view-toggle">` +
@@ -1182,6 +1189,8 @@ function renderResult() {
   });
   const ib = el("image-btn");
   if (ib) ib.addEventListener("click", () => copyShareCard(ib));
+  const pa = el("play-again");
+  if (pa) pa.addEventListener("click", () => reset());
 }
 
 /* ---------------- shareable PNG card ---------------- */

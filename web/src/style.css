@@ -382,12 +382,12 @@ h3 { font-size: 0.82rem; margin: 0 0 0.6rem; color: var(--muted); text-transform
 
 /* Result-screen sidebar re-order: group arena + coach up top, then the court + bench, and drop
    the now-empty place hint. (order only applies while the sidebar is a flex column — desktop.) */
-body[data-revealed="1"] #venue { order: 1; padding-top: 0.3rem; margin-bottom: 0.35rem; }
-body[data-revealed="1"] #venue .arena-art { margin-top: 0; }
-body[data-revealed="1"] #bench { order: 2; margin: 0 0 0.4rem; }
-body[data-revealed="1"] #sixth-slot { order: 3; margin: 0 0 0.4rem; }
-body[data-revealed="1"] .court-wrap { order: 4; }
-body[data-revealed="1"] #place-hint { display: none; }
+body[data-revealed="1"] #venue, body[data-picking="1"] #venue { order: 1; padding-top: 0.3rem; margin-bottom: 0.35rem; }
+body[data-revealed="1"] #venue .arena-art, body[data-picking="1"] #venue .arena-art { margin-top: 0; }
+body[data-revealed="1"] #bench, body[data-picking="1"] #bench { order: 2; margin: 0 0 0.4rem; }
+body[data-revealed="1"] #sixth-slot, body[data-picking="1"] #sixth-slot { order: 3; margin: 0 0 0.4rem; }
+body[data-revealed="1"] .court-wrap, body[data-picking="1"] .court-wrap { order: 4; }
+body[data-revealed="1"] #place-hint, body[data-picking="1"] #place-hint { display: none; }
 
 /* Result card */
 .result-card { text-align: center; padding: 0.8rem 1rem 1.2rem; }
