@@ -27,3 +27,30 @@ export async function leaderboardFor(env, dayKey, uid, limit = 20) {
   const rows = (top.results || []).map((r, i) => ({ ...r, rank: i + 1 }));
   return { total: totalRow ? totalRow.n : 0, top: rows, you: you || null };
 }
+
+// Dynasty streak standings for a board ("alltime" or a week key): best streak first, earliest
+// submission breaking ties, plus the caller's own rank.
+export async function dynastyBoardFor(env, board, uid, limit = 20) {
+  const top = await env.DB.prepare(
+    `SELECT name, streak FROM dynasty_scores WHERE board = ?1
+       ORDER BY streak DESC, created_at ASC LIMIT ?2`
+  ).bind(board, limit).all();
+
+  const totalRow = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM dynasty_scores WHERE board = ?1`
+  ).bind(board).first();
+
+  let you = null;
+  if (uid) {
+    you = await env.DB.prepare(
+      `SELECT name, streak,
+              (SELECT COUNT(*) + 1 FROM dynasty_scores s2
+                 WHERE s2.board = s.board
+                   AND (s2.streak > s.streak OR (s2.streak = s.streak AND s2.created_at < s.created_at))) AS rank
+         FROM dynasty_scores s WHERE s.board = ?1 AND s.uid = ?2`
+    ).bind(board, uid).first();
+  }
+
+  const rows = (top.results || []).map((r, i) => ({ ...r, rank: i + 1 }));
+  return { total: totalRow ? totalRow.n : 0, top: rows, you: you || null };
+}

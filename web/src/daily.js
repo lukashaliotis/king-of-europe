@@ -33,6 +33,17 @@ export function dailySeed(dayKey = utcDayKey()) {
   return hashSeed("KOE-" + dayKey);
 }
 
+// ISO-8601 week key ("2026-W32"), UTC — the identifier for the weekly Dynasty gauntlet. Everyone
+// worldwide shares one key (and thus one seeded challenge) until it rolls over Monday 00:00 UTC.
+export function weekKey(d = new Date()) {
+  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dow = (date.getUTCDay() + 6) % 7;            // Mon=0 … Sun=6
+  date.setUTCDate(date.getUTCDate() - dow + 3);      // move to this week's Thursday
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return date.getUTCFullYear() + "-W" + String(week).padStart(2, "0");
+}
+
 // One draw of the day's board: `size` distinct (club, season) offers, deterministic from the seed.
 // At most one Legends slot; no duplicate club-years.
 function drawBoard(pools, legends, legendsChance, seed, size) {

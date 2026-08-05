@@ -14,7 +14,7 @@ import {
   encodeChallenge, decodeChallenge, reconstructTeam, duel, duelSeed,
 } from "./versus.js";
 import { SALARY_CAP, FLOOR as SALARY_FLOOR, playerCost, canAfford, formatMoney } from "./salary.js";
-import { getIdentity, saveName, submitDaily, fetchLeaderboard } from "./leaderboard.js";
+import { getIdentity, saveName, submitDaily, fetchLeaderboard, submitDynasty, fetchDynastyBoard } from "./leaderboard.js";
 import { resolveGame, orderFive, canSwap, squadStrength, roundRng, drawFor, homeFor } from "./dynasty.js";
 
 const LEGENDS = legendsPool();
@@ -1340,6 +1340,57 @@ function dynastyCourtHTML(d, tinted) {
   `</div>`;
 }
 
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// After a run ends: post it to the all-time board (server re-simulates the streak) and show the
+// standings. No name yet → a small join form. Offline → the run still shows, board just says so.
+async function dynastyOverBoard() {
+  const box = el("dyn-lb"); if (!box) return;
+  const d = state.dynasty;
+  const id = getIdentity();
+  if (!id || !id.name) { renderDynNameEntry(box); return; }
+  box.innerHTML = `<div class="dyn-lb-status">Posting your run…</div>`;
+  try {
+    const data = d.submitted ? await fetchDynastyBoard("alltime", id.uid) : await postDynastyRun("alltime");
+    d.submitted = true;
+    renderDynBoard(box, data);
+  } catch (e) {
+    box.innerHTML = `<div class="dyn-lb-status off">Leaderboard offline — your streak: 🔥 ${d.streak}</div>`;
+  }
+}
+
+function renderDynNameEntry(box) {
+  box.innerHTML =
+    `<div class="dyn-lb-head">👑 All-time streaks</div>` +
+    `<div class="dyn-lb-join"><input id="dyn-name" class="dyn-name-input" maxlength="20" placeholder="Enter a name to join" />` +
+      `<button id="dyn-join" class="mini-btn">Join</button></div>`;
+  const input = el("dyn-name"), join = el("dyn-join");
+  if (input) input.focus();
+  const go = () => { const n = input.value.trim(); if (!n) return; saveName(n); dynastyOverBoard(); };
+  if (join) join.addEventListener("click", go);
+  if (input) input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+}
+
+function postDynastyRun(board) {
+  const d = state.dynasty, id = getIdentity();
+  return submitDynasty({
+    board, name: id.name, uid: id.uid,
+    seed: d.seed, startFive: d.startFive,
+    arena: d.arena ? { teamCode: d.arena.teamCode, season: d.arena.season } : null,
+    choices: d.choices,
+  });
+}
+
+function renderDynBoard(box, data) {
+  const rows = (data.top || []).map((r) =>
+    `<li class="${data.you && r.rank === data.you.rank ? "me" : ""}"><span class="lb-rank">${r.rank}</span>` +
+    `<span class="lb-name">${esc(r.name)}</span><span class="lb-streak">🔥 ${r.streak}</span></li>`).join("");
+  box.innerHTML =
+    `<div class="dyn-lb-head">👑 All-time streaks</div>` +
+    (rows ? `<ol class="dyn-lb-list">${rows}</ol>` : `<div class="dyn-lb-status">Be the first to post a streak.</div>`) +
+    (data.you ? `<div class="dyn-lb-you">You're <b>#${data.you.rank}</b> of ${data.total} · best <b>🔥 ${data.you.streak}</b></div>` : "");
+}
+
 function renderDynasty(card) {
   const d = state.dynasty;
   const opp = d.opp;
@@ -1395,9 +1446,11 @@ function renderDynasty(card) {
           `<div class="result-cats">${catBarsHTML(res)}</div>` +
           `<div class="rc-gate">${GATE_PHRASE[res.gateCategory] || ""}</div>` +
         `</div>` +
+        `<div class="dyn-lb" id="dyn-lb"></div>` +
         `<button id="dyn-again" class="play-btn">↻ New dynasty</button>` +
       `</div>`;
     el("dyn-again").addEventListener("click", () => reset());
+    dynastyOverBoard();
     return;
   }
 

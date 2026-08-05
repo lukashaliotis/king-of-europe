@@ -865,3 +865,20 @@ button.dyn-prow:disabled { opacity: 0.4; cursor: not-allowed; }
 .dyn-half-tag.opp { top: 7px; }
 .dyn-half-tag.you { bottom: 7px; }
 .dyn-half-tag .badge { width: 20px; height: 20px; font-size: 0.5rem; border-radius: 5px; box-shadow: none; }
+
+/* Dynasty streak leaderboard (on the run-over screen) */
+.dyn-lb { margin: 1.1rem 0 0.2rem; text-align: left; }
+.dyn-lb-head { text-align: center; font-weight: 800; font-size: 0.95rem; margin-bottom: 0.5rem; }
+.dyn-lb-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.dyn-lb-list li { display: grid; grid-template-columns: 2rem 1fr auto; align-items: center; gap: 0.5rem; padding: 0.4rem 0.7rem; font-size: 0.9rem; border-top: 1px solid var(--line); }
+.dyn-lb-list li:first-child { border-top: none; }
+.dyn-lb-list li.me { background: color-mix(in srgb, var(--accent) 14%, transparent); font-weight: 700; }
+.lb-rank { color: var(--muted); font-weight: 700; text-align: center; }
+.lb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-streak { font-weight: 700; white-space: nowrap; }
+.dyn-lb-you { text-align: center; font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; }
+.dyn-lb-status { text-align: center; font-size: 0.85rem; color: var(--muted); padding: 0.5rem; }
+.dyn-lb-status.off { color: var(--gate); }
+.dyn-lb-join { display: flex; gap: 0.5rem; justify-content: center; }
+.dyn-name-input { flex: 0 1 220px; background: var(--field); border: 1px solid var(--line); border-radius: 999px; padding: 0.45rem 0.9rem; color: var(--ink); font: inherit; }
+.dyn-name-input:focus { outline: none; border-color: var(--accent); }

@@ -47,3 +47,27 @@ export async function fetchLeaderboard(dayKey, uid) {
   if (!res.ok || !data.ok) throw new Error(data.error || "leaderboard unavailable");
   return data;
 }
+
+/* ---------------- Dynasty streak leaderboards ---------------- */
+
+// Submit a finished run (seed + starting five + recruit choices); the server re-simulates and returns
+// the authoritative streak + the board. `board` is "alltime" or a week key.
+export async function submitDynasty(payload) {
+  const res = await fetch(`${API}/api/dynasty-submit`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || `submit failed (${res.status})`);
+  return data;
+}
+
+export async function fetchDynastyBoard(board, uid) {
+  const q = new URLSearchParams({ board });
+  if (uid) q.set("uid", uid);
+  const res = await fetch(`${API}/api/dynasty-board?${q}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || "leaderboard unavailable");
+  return data;
+}
