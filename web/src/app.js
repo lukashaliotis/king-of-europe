@@ -1145,10 +1145,14 @@ function renderResult() {
     const cap = salaryMode() ? ` · ${formatMoney(salarySpent())}` : "";
     const modeLabel = salaryMode() ? "Salary Cap" : "Classic";
     const weak = post.stage === "champion" ? "" : `\nWeak link: ${weakestLink(res.categoryScores)}`;
-    shareBlock = shareBox(
-      `👑 King of Europe — ${modeLabel}\n${res.wins}–${res.losses} · ${post.label}${icon}${cap}${weak}\n🔗 king-of-europe.pages.dev`
-    ) + `<button id="image-btn" class="ghost-btn dl-lb-btn">📋 Copy image</button>` +
-      `<button id="play-again" class="ghost-btn dl-lb-btn">↻ Play again</button>`;
+    const txt = `👑 King of Europe — ${modeLabel}\n${res.wins}–${res.losses} · ${post.label}${icon}${cap}${weak}\n🔗 king-of-europe.pages.dev`;
+    // The record/stage/weak-link are already shown above, so no visible text preview — just the
+    // copy actions (the share string lives in a hidden <pre> the Copy button reads).
+    shareBlock =
+      `<div class="share-box"><pre class="share-pre" id="share-pre" hidden>${txt}</pre>` +
+        `<button id="share-btn" class="mini-btn">Copy result</button>` +
+        `<button id="image-btn" class="ghost-btn dl-lb-btn">📋 Copy image</button></div>` +
+      `<button id="play-again" class="play-btn">↻ Play again</button>`;
   }
   const postseasonBlock = post.rounds.length
     ? `<div class="view-toggle">` +

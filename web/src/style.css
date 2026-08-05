@@ -283,6 +283,15 @@ body[data-mode="versus"] .respins { display: none; }
   padding: 0.55rem 1.1rem; border-radius: 999px; cursor: pointer; font-size: 0.9rem;
 }
 .ghost-btn:hover { color: var(--ink); border-color: var(--muted); }
+/* Accent-filled call to action (e.g. Play again) — the "regular" orange, to invite another go. */
+.play-btn {
+  display: inline-block; margin-top: 0.7rem; font-size: 0.95rem; font-weight: 700; color: #fff;
+  padding: 0.55rem 1.6rem; border: none; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  box-shadow: 0 5px 14px rgba(239, 108, 0, 0.30); transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.play-btn:hover { transform: translateY(-1px); box-shadow: 0 9px 22px rgba(239, 108, 0, 0.42); }
+.play-btn:active { transform: translateY(0) scale(0.98); }
 
 /* Layout — players wide on the left, compact court + balance on the right */
 .layout { display: grid; grid-template-columns: 1fr 300px; gap: 1rem; align-items: start; }
@@ -387,6 +396,8 @@ body[data-revealed="1"] #venue .arena-art, body[data-picking="1"] #venue .arena-
 body[data-revealed="1"] #bench, body[data-picking="1"] #bench { order: 2; margin: 0 0 0.4rem; }
 body[data-revealed="1"] #sixth-slot, body[data-picking="1"] #sixth-slot { order: 3; margin: 0 0 0.4rem; }
 body[data-revealed="1"] .court-wrap, body[data-picking="1"] .court-wrap { order: 4; }
+/* keep the category bars LAST — without an explicit order they default to 0 and jump to the top */
+body[data-revealed="1"] #sidebar-cats, body[data-picking="1"] #sidebar-cats { order: 5; }
 body[data-revealed="1"] #place-hint, body[data-picking="1"] #place-hint { display: none; }
 
 /* Result card */
