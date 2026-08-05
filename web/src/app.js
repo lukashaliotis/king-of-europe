@@ -345,24 +345,6 @@ function pickSixth(player) {
   state.offer = null; state.pending = null;
   render();
 }
-// The pool a placed player came from, so removing him puts you back at THAT club-year's roster.
-function poolForPlaced(pl) {
-  if (!pl) return null;
-  if (pl._src.teamCode === "LEG") return LEGENDS;
-  return state.pools.find((p) => p.teamCode === pl._src.teamCode && p.season === pl.season) || null;
-}
-// Removing a pick restores its club-year as the current offer (when none is showing) — otherwise
-// place→remove would clear the offer and let Spin re-roll a fresh club-year for free, dodging
-// the one-time re-spins. Now you must re-pick from that roster or spend a real re-spin.
-function restoreOfferFrom(removed) {
-  if (!state.offer) { state.offer = poolForPlaced(removed); state.pending = null; }
-}
-function removePick(i) {
-  const removed = state.slots[i];
-  state.slots[i] = null; clearEndgame();
-  restoreOfferFrom(removed);
-  render();
-}
 function reset() {
   state.slots = [null, null, null, null, null];
   state.offer = null; state.pending = null;
@@ -676,10 +658,8 @@ function renderCourt() {
       const st = clubStyle(s._src.teamCode);
       spot.innerHTML =
         `<span class="disc" style="background:${st.primary};color:${textOn(st.primary)};box-shadow:inset 0 0 0 2px ${st.secondary}">${monogram(s.playerName)}</span>` +
-        `<span class="slot-lbl">${slot.label}</span><span class="spot-nm">${surname(s.playerName)}</span>` +
-        (state.revealed ? "" : `<span class="spot-rm" title="Remove">×</span>`);
-      const rm = spot.querySelector(".spot-rm");
-      if (rm) rm.addEventListener("click", (e) => { e.stopPropagation(); removePick(i); });
+        `<span class="slot-lbl">${slot.label}</span><span class="spot-nm">${surname(s.playerName)}</span>`;
+      // No remove control: a placed player is locked. What you pick, you keep — you spin on.
     } else {
       spot.innerHTML = `<span class="disc"><span class="disc-lbl">${slot.label}</span></span>` +
         `<span class="slot-lbl muted">${POS_FULL[slot.pos]}</span>`;
