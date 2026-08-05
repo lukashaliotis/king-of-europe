@@ -4,8 +4,9 @@
 //
 // Calibrated empirically in sim/dynasty_calib.mjs against real rosters (see docs/DECISIONS.md §15):
 // with esc=1.1 a great run (p90) ≈ 12 wins and an exceptional one (p95) ≈ 15. Re-tune HERE.
-import { projectRecord, gameProbability, DEFAULT_PARAMS } from "./engine.js";
+import { projectRecord, gameProbability, DEFAULT_PARAMS, mulberry32 } from "./engine.js";
 import { arenaFor } from "./arenas.js";
+import { hashSeed } from "./daily.js";
 
 export const DYN = {
   F0: 3,          // round-1 draw floor: weak-ish opponents early so the first games are winnable
@@ -138,3 +139,41 @@ export function canSwap(five, incoming, outIndex) {
 }
 
 export const squadStrength = (five, seasons) => Sof(five, seasons);
+
+/* ---------------- determinism (for replay + the leaderboards) ---------------- */
+
+// A per-round RNG stream, a PURE function of (runSeed, round, salt) — so the opponent draw and the
+// home/away roll for round r are identical for everyone on the same seed regardless of prior play,
+// while the game coin-flip still resolves against the player's own squad strength. This makes a whole
+// run reproducible from (seed, starting five, arena, recruit choices) — the basis of server re-sim.
+export function roundRng(seed, round, salt) {
+  return mulberry32(hashSeed(seed + ":" + round + ":" + salt));
+}
+export const drawFor = (pools, seasons, seed, round) => drawOpponent(pools, seasons, roundRng(seed, round, "opp"), round);
+export const homeFor = (seed, round) => roundRng(seed, round, "loc")() < 0.5;
+
+// Replay a whole run deterministically and return the VERIFIED streak. `five` is already-reconstructed
+// player objects (2G/2F/1C); `choices[r-1] = { inn, out }` are the player-codes swapped after winning
+// round r. Runs identically in the browser (self-check) and the Worker (authoritative). Any illegal
+// swap or a streak longer than the seeded games actually allow is rejected.
+export function replayDynastyRun(pools, seasons, sub, maxRounds = 200) {
+  if (!Array.isArray(sub.five) || sub.five.length !== 5 || !legalFive(sub.five)) return { ok: false, error: "illegal starting five" };
+  const homeMult = sub.arena ? sub.arena.mult : 1;
+  let five = orderFive(sub.five);
+  let streak = 0;
+  for (let r = 1; r <= maxRounds; r++) {
+    const opp = drawOpponent(pools, seasons, roundRng(sub.seed, r, "opp"), r);
+    if (!opp || !opp.five) break;
+    const home = roundRng(sub.seed, r, "loc")() < 0.5;
+    const res = resolveGame(Sof(five, seasons), opp, home, homeMult, roundRng(sub.seed, r, "game"));
+    if (!res.win) break;         // the seeded game decides the loss — not the client
+    streak++;
+    const choice = (sub.choices || [])[r - 1];
+    if (!choice) break;          // player ended the run here (no recruit recorded)
+    const incoming = opp.five.find((p) => p.playerCode === choice.inn);
+    const outIdx = five.findIndex((p) => p.playerCode === choice.out);
+    if (!incoming || outIdx < 0 || !canSwap(five, incoming, outIdx)) return { ok: false, error: "illegal recruit at round " + r };
+    five = orderFive(five.map((p, i) => (i === outIdx ? incoming : p)));
+  }
+  return { ok: true, streak };
+}

@@ -15,7 +15,7 @@ import {
 } from "./versus.js";
 import { SALARY_CAP, FLOOR as SALARY_FLOOR, playerCost, canAfford, formatMoney } from "./salary.js";
 import { getIdentity, saveName, submitDaily, fetchLeaderboard } from "./leaderboard.js";
-import { DYN, drawOpponent, resolveGame, orderFive, canSwap, squadStrength } from "./dynasty.js";
+import { resolveGame, orderFive, canSwap, squadStrength, roundRng, drawFor, homeFor } from "./dynasty.js";
 
 const LEGENDS = legendsPool();
 
@@ -464,17 +464,22 @@ function applyDynastySquad(five) {
   state.arenaSlot = idx >= 0 ? idx : null;
 }
 
-// Freeze the drafted home arena, field the five, and begin the first round.
+// Freeze the drafted home arena (its FULL rating — not share-scaled — so the server can reproduce it
+// from just teamCode+season), field the five, seed the run, and begin. The seed makes the whole
+// gauntlet reproducible; `choices` records each recruit so a run can be submitted and re-simulated.
 function startGauntlet() {
   if (inGauntlet()) return;
-  const a = chosenArena();
   const homeSlot = state.arenaSlot != null ? state.slots[state.arenaSlot] : null;
+  const base = homeSlot ? arenaFor(homeSlot._src.teamCode, homeSlot.season) : null;
   const st = homeSlot ? clubStyle(homeSlot._src.teamCode) : { primary: "#888", secondary: "#555", abbr: "" };
   state.dynasty = {
     started: true, round: 1, streak: 0, phase: "spin",
     squad: [...state.slots],
-    arena: a ? { mult: a.mult, name: a.name, rating: a.rating, cap: a.cap, teamCode: homeSlot ? homeSlot._src.teamCode : null,
-                 primary: st.primary, secondary: st.secondary, abbr: st.abbr } : null,
+    seed: (Math.random() * 0xffffffff) >>> 0,
+    startFive: state.slots.map((p) => ({ code: p.playerCode, season: p.season })),
+    choices: [],
+    arena: base ? { mult: base.mult, name: base.name, rating: base.rating, cap: base.cap, teamCode: homeSlot._src.teamCode,
+                    season: homeSlot.season, primary: st.primary, secondary: st.secondary, abbr: st.abbr } : null,
     opp: null, home: true, lastGame: null, pickIn: null, pickOut: null, recruitStep: "in", spin: null, play: null,
   };
   applyDynastySquad(state.dynasty.squad);
@@ -484,8 +489,8 @@ function startGauntlet() {
 // Draw the next opponent + home/away, then spin them into view (the reveal is half the fun).
 function beginRound() {
   const d = state.dynasty;
-  d.opp = drawOpponent(state.pools, state.data.seasons, Math.random, d.round);
-  d.home = Math.random() < 0.5;
+  d.opp = drawFor(state.pools, state.data.seasons, d.seed, d.round);
+  d.home = homeFor(d.seed, d.round);
   d.lastGame = null; d.play = null;
   animateMatchupSpin();
 }
@@ -543,7 +548,7 @@ function playGauntletGame() {
   clearTimeout(dynTimer);
   const myS = squadStrength(state.slots, state.data.seasons);
   const homeMult = d.arena ? d.arena.mult : 1;
-  d.lastGame = resolveGame(myS, d.opp, d.home, homeMult, Math.random);
+  d.lastGame = resolveGame(myS, d.opp, d.home, homeMult, roundRng(d.seed, d.round, "game"));
   d.phase = "playing"; d.play = { q: 0, mine: 0, theirs: 0, done: false };
   render();
   animateScore();
@@ -580,6 +585,7 @@ function confirmRecruit() {
   const d = state.dynasty;
   const incoming = d.opp.five.find((p) => p.playerCode === d.pickIn);
   if (!incoming || d.pickOut == null || !canSwap(d.squad, incoming, d.pickOut)) return;
+  d.choices.push({ inn: incoming.playerCode, out: d.squad[d.pickOut].playerCode }); // record for re-sim
   const next = d.squad.map((p, i) => (i === d.pickOut ? incoming : p));
   applyDynastySquad(next);
   d.round++;
