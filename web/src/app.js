@@ -490,37 +490,50 @@ function beginRound() {
   animateMatchupSpin();
 }
 
-// Slot-machine reveal of the opponent (club + year), then a home/away flip. Updates the reel DOM
-// directly between frames; the outcome is already decided (deterministic reveal, not the draw).
+// The reveal, in sequence: (1) spin the OPPONENT (club+year reel), (2) the five take the court, (3) the
+// home/away spin runs with the players already out there, (4) the floor gradually tints the home
+// colour. Outcomes are already decided — this only animates the reveal.
 function animateMatchupSpin() {
   clearTimeout(dynTimer);
   const d = state.dynasty;
-  d.phase = "spin"; d.spin = { stage: "opp", landedOpp: false, landedLoc: false };
+  d.phase = "spinTeam";
   render();
   const codes = [...new Set(state.pools.map((p) => p.teamCode))];
   const years = [...new Set(state.pools.map((p) => p.season))];
   const setReel = (club, year) => { const c = el("dyn-reel-club"), y = el("dyn-reel-year"); if (c) c.textContent = club; if (y) y.textContent = year; };
-  const setLoc = (loc, landed) => { const l = el("dyn-loc-reel"); if (l) { l.textContent = loc === "home" ? "🏠 HOME" : "✈️ AWAY"; l.className = "dyn-loc-reel " + loc + (landed ? " landed" : ""); } };
-  const NO = 24, NL = 14;
+  const NO = 24;
   let i = 0;
   const tickOpp = () => {
     if (i >= NO) {
       const st = clubStyle(d.opp.teamCode);
       setReel(st.abbr, d.opp.seasonLabel);
       const c = el("dyn-reel-club"); if (c) { c.classList.add("landed"); c.style.background = st.primary; c.style.color = textOn(st.primary); }
-      d.spin.landedOpp = true;
-      dynTimer = setTimeout(() => { i = 0; tickLoc(); }, 550);
+      dynTimer = setTimeout(() => { d.phase = "spinLoc"; render(); spinLoc(); }, 700); // five take the court, then home/away spins
       return;
     }
     setReel(clubStyle(codes[(Math.random() * codes.length) | 0]).abbr, state.data.seasons[String(years[(Math.random() * years.length) | 0])].label);
     i++; const t = i / NO; dynTimer = setTimeout(tickOpp, 45 + Math.pow(t, 2) * 78);
   };
-  const tickLoc = () => {
-    if (i >= NL) { setLoc(d.home ? "home" : "away", true); dynTimer = setTimeout(() => { d.phase = "matchup"; render(); }, 850); return; }
-    setLoc(i % 2 === 0 ? "home" : "away", false);
-    i++; const t = i / NL; dynTimer = setTimeout(tickLoc, 60 + Math.pow(t, 2) * 95);
-  };
   dynTimer = setTimeout(tickOpp, 120);
+}
+
+// Home/away spin, with the five already on the court; when it lands, the floor tints in (CSS trans).
+function spinLoc() {
+  const d = state.dynasty;
+  const setLoc = (loc, landed) => { const l = el("dyn-loc-reel"); if (l) { l.textContent = loc === "home" ? "🏠 HOME" : "✈️ AWAY"; l.className = "dyn-loc-reel " + loc + (landed ? " landed" : ""); } };
+  const NL = 14;
+  let i = 0;
+  const tick = () => {
+    if (i >= NL) {
+      setLoc(d.home ? "home" : "away", true);
+      const court = document.querySelector(".dyn-court"); if (court) court.classList.add("tinted"); // gradual wash
+      dynTimer = setTimeout(() => { d.phase = "matchup"; render(); }, 1100);
+      return;
+    }
+    setLoc(i % 2 === 0 ? "home" : "away", false);
+    i++; const t = i / NL; dynTimer = setTimeout(tick, 60 + Math.pow(t, 2) * 95);
+  };
+  dynTimer = setTimeout(tick, 300);
 }
 
 // Play the single game, then reveal the score quarter by quarter like a live sim.
@@ -1282,7 +1295,7 @@ const dynHeader = (d, note) =>
 // Full-court spots: your five fill the bottom half (basket at the bottom), the opponent's the top
 // half (basket at the top) — the half-court SLOTS mirrored into each end.
 const DYN_YOU = SLOTS.map((s) => ({ x: s.x, y: 100 - s.y * 0.5 }));
-const DYN_OPP = SLOTS.map((s) => ({ x: 100 - s.x, y: s.y * 0.5 }));
+const DYN_OPP = SLOTS.map((s) => ({ x: s.x, y: s.y * 0.5 })); // same formation, mirrored to the top
 function dynDisc(p, teamCode, slot) {
   const st = clubStyle(teamCode);
   return `<div class="dyn-spot" style="left:${slot.x}%;top:${slot.y}%">` +
@@ -1305,16 +1318,17 @@ const DYN_COURT_SVG =
   `</svg>`;
 // The matchup court: your five bottom, opponent's five top, the whole floor tinted the HOME club's
 // colour (you at home, them away). The score simulates ABOVE it.
-function dynastyCourtHTML(d) {
+// `tinted` controls the home-club colour wash — off during the home/away spin, then animated in (CSS
+// transition) once the result lands. The opponent's name/logo is NOT on the court (it sits above it).
+function dynastyCourtHTML(d, tinted) {
   const opp = d.opp;
   const homeCode = d.home ? (d.arena && d.arena.teamCode) : opp.teamCode;
   const tint = homeCode ? clubStyle(homeCode) : null;
   const oppDiscs = opp.five.map((p, i) => dynDisc(p, opp.teamCode, DYN_OPP[i])).join("");
   const youDiscs = state.slots.map((p, i) => dynDisc(p, p._src.teamCode, DYN_YOU[i])).join("");
-  return `<div class="dyn-court"${tint ? ` style="--tint:${tint.primary}"` : ""}>` +
+  return `<div class="dyn-court${tinted ? " tinted" : ""}"${tint ? ` style="--tint:${tint.primary}"` : ""}>` +
     DYN_COURT_SVG +
-    (tint ? `<div class="dyn-court-tint"></div><div class="dyn-court-mark">${tint.abbr}</div>` : "") +
-    `<div class="dyn-half-tag opp">${badge(opp.teamCode)} ${opp.seasonLabel}</div>` +
+    `<div class="dyn-court-tint"></div><div class="dyn-court-mark">${tint ? tint.abbr : ""}</div>` +
     `<div class="dyn-half-tag you">Your five</div>` +
     oppDiscs + youDiscs +
   `</div>`;
@@ -1325,16 +1339,26 @@ function renderDynasty(card) {
   const opp = d.opp;
   const oppName = `${badge(opp.teamCode)} <b>${prettyName(opp.teamName)}</b> <span class="muted">${opp.seasonLabel}</span>`;
 
-  // ---- spinning up the next challenger + home/away ----
-  if (d.phase === "spin") {
+  // ---- (1) spinning up the next challenger ----
+  if (d.phase === "spinTeam") {
     card.innerHTML =
       dynHeader(d, `Round ${d.round}`) +
       `<div class="dyn-spin">` +
         `<div class="dyn-spin-cap">Drawing your next challenger…</div>` +
         `<div class="reels dyn-reels"><div class="reel-box" id="dyn-reel-club">···</div>` +
           `<div class="reel-box year" id="dyn-reel-year">····</div></div>` +
-        `<div class="dyn-loc-reel" id="dyn-loc-reel">· · ·</div>` +
       `</div>`;
+    return;
+  }
+
+  // ---- (2)+(3) the five take the court, then home/away spins (court untinted until it lands) ----
+  if (d.phase === "spinLoc") {
+    card.innerHTML =
+      dynHeader(d, `Round ${d.round}`) +
+      `<div class="dyn-loc-spin"><span class="dyn-loc-cap">Home or away —</span> ` +
+        `<span class="dyn-loc-reel" id="dyn-loc-reel">· · ·</span></div>` +
+      `<div class="dyn-abovecourt">${prettyName(opp.teamName)} <span class="muted">${opp.seasonLabel}</span></div>` +
+      dynastyCourtHTML(d, false);
     return;
   }
 
@@ -1347,7 +1371,7 @@ function renderDynasty(card) {
         `<div class="dsb-mid"><div class="dsb-q" id="dyn-score-q">Q1</div></div>` +
         `<div class="dsb-side"><div class="dsb-team">${badge(opp.teamCode)} ${clubStyle(opp.teamCode).abbr}</div><div class="dsb-score" id="dyn-score-theirs">0</div></div>` +
       `</div>` +
-      dynastyCourtHTML(d);
+      dynastyCourtHTML(d, true);
     return;
   }
 
@@ -1389,24 +1413,23 @@ function renderDynasty(card) {
     return;
   }
 
-  // ---- recruit STEP 2: choose who to release (same position), stats side by side ----
+  // ---- recruit STEP 2: choose who to release — only the SAME-position players, so it fits on one
+  //      screen with the incoming player's stats and the actions (no scrolling). ----
   if (d.phase === "recruit" && d.recruitStep === "out") {
     const incoming = opp.five.find((p) => p.playerCode === d.pickIn);
-    const rows = d.squad.map((p, i) => {
-      const legal = canSwap(d.squad, incoming, i);
-      const sel = d.pickOut === i;
-      return dynStatRow(p, p._src.teamCode, { as: "button", cls: "out" + (sel ? " sel" : ""), attrs: `data-out="${i}" ${legal ? "" : "disabled title='Different position — pick a " + (POS_FULL[incoming.pos] || incoming.pos) + "'"}`, from: `${clubStyle(p._src.teamCode).abbr} ${p._src.seasonLabel}` });
-    }).join("");
+    const cands = d.squad.map((p, i) => ({ p, i })).filter(({ i }) => canSwap(d.squad, incoming, i));
+    const rows = cands.map(({ p, i }) =>
+      dynStatRow(p, p._src.teamCode, { as: "button", cls: "out" + (d.pickOut === i ? " sel" : ""), attrs: `data-out="${i}"`, from: `${clubStyle(p._src.teamCode).abbr} ${p._src.seasonLabel}` })
+    ).join("");
     const ready = d.pickOut != null && canSwap(d.squad, incoming, d.pickOut);
     card.innerHTML =
       dynHeader(d, `Round ${d.round} won`) +
       `<div class="dyn-incoming"><span class="dyn-in-tag">Coming in</span>` +
         dynStatRow(incoming, opp.teamCode, { cls: "in", from: `${clubStyle(opp.teamCode).abbr} ${opp.seasonLabel}` }) + `</div>` +
       `<h3 class="dyn-loot">Release a ${POS_FULL[incoming.pos] || incoming.pos}</h3>` +
-      `<p class="dyn-sub">Your ${incoming.pos === "C" ? "centre" : POS_FULL[incoming.pos].toLowerCase()}${incoming.pos === "G" || incoming.pos === "F" ? "s make" : " makes"} way — pick who.</p>` +
       `<div class="dyn-plist">${rows}</div>` +
       `<div class="dyn-actions"><button id="dyn-back" class="mini-btn">← Change pick</button>` +
-        `<button id="dyn-confirm" class="play-btn" ${ready ? "" : "disabled"}>Confirm swap →</button></div>`;
+        `<button id="dyn-confirm" class="play-btn" ${ready ? "" : "disabled"}>Confirm swap</button></div>`;
     card.querySelectorAll("[data-out]").forEach((b) =>
       b.addEventListener("click", () => { d.pickOut = Number(b.dataset.out); render(); }));
     el("dyn-back").addEventListener("click", () => { d.recruitStep = "in"; d.pickOut = null; render(); });
@@ -1418,9 +1441,9 @@ function renderDynasty(card) {
   card.innerHTML =
     dynHeader(d, `Round ${d.round}`) +
     `<div class="dyn-loc ${d.home ? "home" : "away"}">${d.home ? "🏠 Home — " + (d.arena ? d.arena.name : "your floor") : "✈️ Away — " + opp.arenaName}</div>` +
-    `<div class="dyn-abovecourt">Facing ${oppName}</div>` +
-    dynastyCourtHTML(d) +
-    `<button id="dyn-play" class="play-btn">▶ Play the game</button>`;
+    `<div class="dyn-abovecourt">${prettyName(opp.teamName)} <span class="muted">${opp.seasonLabel}</span></div>` +
+    dynastyCourtHTML(d, true) +
+    `<div class="dyn-play-wrap"><button id="dyn-play" class="play-btn">▶ Play the game</button></div>`;
   el("dyn-play").addEventListener("click", playGauntletGame);
 }
 

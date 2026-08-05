@@ -769,7 +769,10 @@ body[data-revealed="1"] #place-hint, body[data-picking="1"] #place-hint { displa
 .dyn-odds.good .dyn-odds-pct { color: var(--good); }
 .dyn-odds.even .dyn-odds-pct { color: var(--gate); }
 .dyn-odds.long .dyn-odds-pct { color: var(--bad); }
-#dyn-play, #dyn-confirm, #dyn-again { display: block; width: 100%; margin-top: 0.9rem; }
+/* Dynasty action buttons are normal-sized (like every other button), not full-width bars */
+.dyn-play-wrap { text-align: center; margin-top: 0.6rem; }
+.dyn-play-wrap #dyn-play { margin: 0; }
+#dyn-again { margin-top: 1rem; }
 
 /* recruit picker */
 .dyn-scoreline { text-align: center; font-weight: 700; padding: 0.5rem; border-radius: 10px; margin-bottom: 0.7rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; flex-wrap: wrap; }
@@ -833,9 +836,9 @@ button.dyn-prow:disabled { opacity: 0.4; cursor: not-allowed; }
 .dyn-prow-box b { color: var(--ink); font-weight: 700; }
 .dyn-incoming { margin-bottom: 0.3rem; }
 .dyn-in-tag { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 800; color: var(--good); margin-bottom: 0.3rem; text-align: center; }
-.dyn-actions { display: flex; gap: 0.6rem; align-items: center; margin-top: 0.9rem; }
-.dyn-actions #dyn-confirm { flex: 1; margin-top: 0; }
-.dyn-actions #dyn-back { margin-top: 0; white-space: nowrap; }
+.dyn-actions { display: flex; gap: 0.7rem; justify-content: center; align-items: center; margin-top: 0.9rem; }
+.dyn-actions #dyn-confirm { margin: 0; }
+.dyn-actions #dyn-back { margin: 0; white-space: nowrap; }
 
 @media (max-width: 560px) {
   .dyn-prow { grid-template-columns: auto 1fr; }
@@ -845,10 +848,16 @@ button.dyn-prow:disabled { opacity: 0.4; cursor: not-allowed; }
 /* the split matchup court: your five (bottom) vs the opponent's (top), tinted by the home club */
 .dyn-abovecourt { text-align: center; font-size: 0.95rem; color: var(--muted); margin-bottom: 0.1rem; }
 .dyn-abovecourt .badge { width: 26px; height: 26px; font-size: 0.62rem; border-radius: 7px; vertical-align: middle; }
-.dyn-court { position: relative; width: 100%; max-width: 216px; margin: 0.5rem auto 0.2rem; aspect-ratio: 300 / 480; border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 3px var(--tint, var(--line)), 0 8px 24px rgba(20,40,70,0.18); }
+.dyn-court { position: relative; width: 100%; max-width: 216px; margin: 0.5rem auto 0.2rem; aspect-ratio: 300 / 480; border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 3px var(--line), 0 8px 24px rgba(20,40,70,0.18); transition: box-shadow 0.85s ease; }
+.dyn-court.tinted { box-shadow: 0 0 0 3px var(--tint, var(--line)), 0 8px 24px rgba(20,40,70,0.18); }
 .dyn-court-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.dyn-court-tint { position: absolute; inset: 0; background: var(--tint); opacity: 0.13; pointer-events: none; }
-.dyn-court-mark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 4.2rem; font-weight: 900; color: var(--tint); opacity: 0.14; pointer-events: none; letter-spacing: -0.03em; }
+.dyn-court-tint { position: absolute; inset: 0; background: var(--tint); opacity: 0; pointer-events: none; transition: opacity 0.85s ease; }
+.dyn-court.tinted .dyn-court-tint { opacity: 0.13; }
+.dyn-court-mark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 4.2rem; font-weight: 900; color: var(--tint); opacity: 0; pointer-events: none; letter-spacing: -0.03em; transition: opacity 0.85s ease; }
+.dyn-court.tinted .dyn-court-mark { opacity: 0.14; }
+.dyn-loc-spin { text-align: center; font-size: 1.05rem; font-weight: 700; margin-bottom: 0.6rem; }
+.dyn-loc-cap { color: var(--muted); font-weight: 600; font-size: 0.9rem; }
+.dyn-loc-spin .dyn-loc-reel { display: inline-block; margin-top: 0; }
 .dyn-spot { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
 .dyn-spot .disc { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.66rem; }
 .dyn-spot-nm { font-size: 0.6rem; font-weight: 700; color: #17222f; background: rgba(255,255,255,0.82); padding: 0 4px; border-radius: 4px; white-space: nowrap; }
