@@ -1149,10 +1149,10 @@ function renderResult() {
     // The record/stage/weak-link are already shown above, so no visible text preview — just the
     // copy actions (the share string lives in a hidden <pre> the Copy button reads).
     shareBlock =
+      `<button id="play-again" class="play-btn">↻ Play again</button>` +
       `<div class="share-box"><pre class="share-pre" id="share-pre" hidden>${txt}</pre>` +
         `<button id="share-btn" class="mini-btn">Copy result</button>` +
-        `<button id="image-btn" class="ghost-btn dl-lb-btn">📋 Copy image</button></div>` +
-      `<button id="play-again" class="play-btn">↻ Play again</button>`;
+        `<button id="image-btn" class="ghost-btn dl-lb-btn">📋 Copy image</button></div>`;
   }
   const postseasonBlock = post.rounds.length
     ? `<div class="view-toggle">` +
