@@ -379,6 +379,13 @@ streak," not "34-4." Locked design (user, this session):
   anti-cheat already built for Daily).
 - **Build order:** (1) core local loop, (2) split-court + animated score, (3) calibration pass feeds
   (1)'s numbers, (4) the two leaderboards.
+- **Split court DONE (2026-08-05c):** the matchup + game now render a full vertical court in the main
+  panel — opponent's five on the top half (basket at top), yours on the bottom (basket at bottom),
+  the whole floor tinted the HOME club's colour (you at home, them away) with its abbr watermark. The
+  simulated score sits ABOVE the court during the game. `DYN_YOU`/`DYN_OPP` mirror the half-court
+  SLOTS into each end; `dynastyCourtHTML()` + `DYN_COURT_SVG` (reuses `.c-floor`/`.c-line`). Sidebar
+  still shows your five + arena + category bars as the persistent squad reference. Remaining Dynasty
+  work: (4) the two leaderboards; (3) recalibrate for 5v5 after real play.
 - **Revision (user, 2026-08-05b):** (1) **5v5, not 6v6** — dropped the 6th man in Dynasty so opponents
   and you both field five, and every recruit is a like-for-like positional swap (take their centre →
   drop yours) with no bench to park a dud. (2) Opponent + **home/away are now spin animations** (reel

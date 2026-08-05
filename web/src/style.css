@@ -841,3 +841,18 @@ button.dyn-prow:disabled { opacity: 0.4; cursor: not-allowed; }
   .dyn-prow { grid-template-columns: auto 1fr; }
   .dyn-prow-box { grid-column: 1 / -1; text-align: left; margin-left: 2rem; }
 }
+
+/* the split matchup court: your five (bottom) vs the opponent's (top), tinted by the home club */
+.dyn-abovecourt { text-align: center; font-size: 0.95rem; color: var(--muted); margin-bottom: 0.1rem; }
+.dyn-abovecourt .badge { width: 26px; height: 26px; font-size: 0.62rem; border-radius: 7px; vertical-align: middle; }
+.dyn-court { position: relative; width: 100%; max-width: 216px; margin: 0.5rem auto 0.2rem; aspect-ratio: 300 / 480; border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 3px var(--tint, var(--line)), 0 8px 24px rgba(20,40,70,0.18); }
+.dyn-court-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dyn-court-tint { position: absolute; inset: 0; background: var(--tint); opacity: 0.13; pointer-events: none; }
+.dyn-court-mark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 4.2rem; font-weight: 900; color: var(--tint); opacity: 0.14; pointer-events: none; letter-spacing: -0.03em; }
+.dyn-spot { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
+.dyn-spot .disc { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.66rem; }
+.dyn-spot-nm { font-size: 0.6rem; font-weight: 700; color: #17222f; background: rgba(255,255,255,0.82); padding: 0 4px; border-radius: 4px; white-space: nowrap; }
+.dyn-half-tag { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 0.3rem; font-size: 0.62rem; font-weight: 700; color: #fff; background: rgba(18,26,40,0.74); padding: 0.15rem 0.55rem; border-radius: 999px; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+.dyn-half-tag.opp { top: 7px; }
+.dyn-half-tag.you { bottom: 7px; }
+.dyn-half-tag .badge { width: 20px; height: 20px; font-size: 0.5rem; border-radius: 5px; box-shadow: none; }

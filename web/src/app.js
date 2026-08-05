@@ -1279,6 +1279,47 @@ const dynHeader = (d, note) =>
   `<div class="dyn-head"><div class="dyn-streak">🔥 <b>${d.streak}</b> <span>streak</span></div>` +
     `<div class="dyn-round">${note}</div></div>`;
 
+// Full-court spots: your five fill the bottom half (basket at the bottom), the opponent's the top
+// half (basket at the top) — the half-court SLOTS mirrored into each end.
+const DYN_YOU = SLOTS.map((s) => ({ x: s.x, y: 100 - s.y * 0.5 }));
+const DYN_OPP = SLOTS.map((s) => ({ x: 100 - s.x, y: s.y * 0.5 }));
+function dynDisc(p, teamCode, slot) {
+  const st = clubStyle(teamCode);
+  return `<div class="dyn-spot" style="left:${slot.x}%;top:${slot.y}%">` +
+    `<span class="disc" style="background:${st.primary};color:${textOn(st.primary)};box-shadow:inset 0 0 0 2px ${st.secondary}">${monogram(p.playerName)}</span>` +
+    `<span class="dyn-spot-nm">${surname(p.playerName)}</span></div>`;
+}
+const DYN_COURT_SVG =
+  `<svg class="dyn-court-svg" viewBox="0 0 300 480" preserveAspectRatio="none" aria-hidden="true">` +
+    `<rect class="c-floor" x="4" y="4" width="292" height="472" rx="8"/>` +
+    // opponent end (top)
+    `<rect class="c-line" x="110" y="4" width="80" height="118" fill="none"/>` +
+    `<circle class="c-line" cx="150" cy="122" r="30" fill="none"/>` +
+    `<line class="c-line" x1="132" y1="16" x2="168" y2="16"/><circle class="c-line" cx="150" cy="24" r="7" fill="none"/>` +
+    // your end (bottom)
+    `<rect class="c-line" x="110" y="358" width="80" height="118" fill="none"/>` +
+    `<circle class="c-line" cx="150" cy="358" r="30" fill="none"/>` +
+    `<line class="c-line" x1="132" y1="464" x2="168" y2="464"/><circle class="c-line" cx="150" cy="456" r="7" fill="none"/>` +
+    // half-court line + centre circle
+    `<line class="c-line" x1="4" y1="240" x2="296" y2="240"/><circle class="c-line" cx="150" cy="240" r="34" fill="none"/>` +
+  `</svg>`;
+// The matchup court: your five bottom, opponent's five top, the whole floor tinted the HOME club's
+// colour (you at home, them away). The score simulates ABOVE it.
+function dynastyCourtHTML(d) {
+  const opp = d.opp;
+  const homeCode = d.home ? (d.arena && d.arena.teamCode) : opp.teamCode;
+  const tint = homeCode ? clubStyle(homeCode) : null;
+  const oppDiscs = opp.five.map((p, i) => dynDisc(p, opp.teamCode, DYN_OPP[i])).join("");
+  const youDiscs = state.slots.map((p, i) => dynDisc(p, p._src.teamCode, DYN_YOU[i])).join("");
+  return `<div class="dyn-court"${tint ? ` style="--tint:${tint.primary}"` : ""}>` +
+    DYN_COURT_SVG +
+    (tint ? `<div class="dyn-court-tint"></div><div class="dyn-court-mark">${tint.abbr}</div>` : "") +
+    `<div class="dyn-half-tag opp">${badge(opp.teamCode)} ${opp.seasonLabel}</div>` +
+    `<div class="dyn-half-tag you">Your five</div>` +
+    oppDiscs + youDiscs +
+  `</div>`;
+}
+
 function renderDynasty(card) {
   const d = state.dynasty;
   const opp = d.opp;
@@ -1297,16 +1338,16 @@ function renderDynasty(card) {
     return;
   }
 
-  // ---- playing: the score reveals quarter by quarter ----
+  // ---- playing: the score simulates ABOVE the split court, quarter by quarter ----
   if (d.phase === "playing") {
     card.innerHTML =
       dynHeader(d, `Round ${d.round}`) +
-      `<div class="dyn-loc ${d.home ? "home" : "away"}">${d.home ? "🏠 Home — " + (d.arena ? d.arena.name : "your floor") : "✈️ Away — " + opp.arenaName}</div>` +
       `<div class="dyn-scoreboard" id="dyn-scoreboard">` +
         `<div class="dsb-side"><div class="dsb-team">Your five</div><div class="dsb-score" id="dyn-score-mine">0</div></div>` +
         `<div class="dsb-mid"><div class="dsb-q" id="dyn-score-q">Q1</div></div>` +
         `<div class="dsb-side"><div class="dsb-team">${badge(opp.teamCode)} ${clubStyle(opp.teamCode).abbr}</div><div class="dsb-score" id="dyn-score-theirs">0</div></div>` +
-      `</div>`;
+      `</div>` +
+      dynastyCourtHTML(d);
     return;
   }
 
@@ -1373,15 +1414,12 @@ function renderDynasty(card) {
     return;
   }
 
-  // ---- the next matchup (opponent + home/away already spun in) ----
+  // ---- the next matchup: the split court (your five vs theirs), home/away tint ----
   card.innerHTML =
     dynHeader(d, `Round ${d.round}`) +
     `<div class="dyn-loc ${d.home ? "home" : "away"}">${d.home ? "🏠 Home — " + (d.arena ? d.arena.name : "your floor") : "✈️ Away — " + opp.arenaName}</div>` +
-    `<div class="dyn-matchup">` +
-      `<div class="dyn-opp-head">Next up</div>` +
-      `<div class="dyn-opp-name">${oppName}</div>` +
-      `<div class="dyn-opp-five">${opp.five.map((p) => dynChip(p, opp.teamCode)).join("")}</div>` +
-    `</div>` +
+    `<div class="dyn-abovecourt">Facing ${oppName}</div>` +
+    dynastyCourtHTML(d) +
     `<button id="dyn-play" class="play-btn">▶ Play the game</button>`;
   el("dyn-play").addEventListener("click", playGauntletGame);
 }
