@@ -379,6 +379,17 @@ streak," not "34-4." Locked design (user, this session):
   anti-cheat already built for Daily).
 - **Build order:** (1) core local loop, (2) split-court + animated score, (3) calibration pass feeds
   (1)'s numbers, (4) the two leaderboards.
+- **Revision (user, 2026-08-05b):** (1) **5v5, not 6v6** — dropped the 6th man in Dynasty so opponents
+  and you both field five, and every recruit is a like-for-like positional swap (take their centre →
+  drop yours) with no bench to park a dud. (2) Opponent + **home/away are now spin animations** (reel
+  reveal), not instant. (3) **Win % removed** from the matchup (a coin-flip number cheapened it). (4)
+  **Score reveals quarter by quarter** like a live sim (scoreline carries per-quarter splits). (5)
+  "Loot the vanquished" → **"Pick 1 player"**. (6) Recruit is now **two screens** — pick the incoming
+  player (full box stats shown), then a second screen to choose who to release (incoming stats + your
+  same-position players' stats side by side, off-position greyed) — so it's not blind. (7) Run-over
+  screen drops the flavour line for a **Classic-style weakest-area readout** (category bars + "Not
+  enough X"). Squad model: `dynasty.js` now `orderFive`/`canSwap` on a 5-array (position-locked swaps);
+  `complete()`/`hasRoomFor`/`renderSixth` gate out the 6th man in Dynasty.
 - **Also this session:** placed players are now **locked** — the send-away × on the court was removed
   entirely (dead `removePick`/`restoreOfferFrom`/`poolForPlaced` chain deleted). "Play again" moved
   above the copy buttons so it's visible without scrolling.

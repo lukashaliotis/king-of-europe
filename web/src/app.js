@@ -15,7 +15,7 @@ import {
 } from "./versus.js";
 import { SALARY_CAP, FLOOR as SALARY_FLOOR, playerCost, canAfford, formatMoney } from "./salary.js";
 import { getIdentity, saveName, submitDaily, fetchLeaderboard } from "./leaderboard.js";
-import { DYN, drawOpponent, resolveGame, winProbability, bestSplit, canSwap, squadStrength } from "./dynasty.js";
+import { DYN, drawOpponent, resolveGame, orderFive, canSwap, squadStrength } from "./dynasty.js";
 
 const LEGENDS = legendsPool();
 
@@ -78,6 +78,7 @@ const state = {
 let dragging = null;
 let spinTimer = null;
 let revealTimer = null;
+let dynTimer = null; // Dynasty animations (opponent/home-away spin, simulated score reveal)
 
 function prettyName(name) {
   return name.split(",")
@@ -210,7 +211,7 @@ const openPositions = () => SLOTS.filter((s, i) => !state.slots[i]).map((s) => s
 const openSlotsFor = (pos) => SLOTS.map((s, i) => ({ s, i })).filter(({ s, i }) => s.pos === pos && !state.slots[i]);
 const isDup = (player) => filled().some((s) => s.playerCode === player.playerCode)
   || (state.sixth && state.sixth.playerCode === player.playerCode);
-const sixthOpen = () => !state.sixth;
+const sixthOpen = () => !state.sixth && !dynastyMode(); // Dynasty is 5v5 — no bench slot
 const hasRoomFor = (player) => openSlotsFor(player.pos).length > 0 || sixthOpen();
 
 /* ---------------- mode helpers ---------------- */
@@ -232,7 +233,8 @@ const canAffordPick = (player) =>
 // a player is placeable if there's room AND (in salary mode) you can afford him
 const canPlace = (player) => !isDup(player) && hasRoomFor(player) && canAffordPick(player);
 const startersFilled = () => filled().length >= 5;
-const complete = () => startersFilled() && !!state.sixth;    // 6 picked -> endgame
+// Classic/Daily/Salary/Versus: 5 starters + a 6th man. Dynasty is 5v5 — five starters IS the squad.
+const complete = () => startersFilled() && (dynastyMode() || !!state.sixth);
 const pickedCount = () => filled().length + (state.sixth ? 1 : 0);
 
 /* ---------------- spin (with a slot-machine roll) ---------------- */
@@ -362,6 +364,7 @@ function reset() {
   state.respins = { club: true, year: true, both: true };
   state.sixth = null;
   state.dynasty = null;
+  clearTimeout(dynTimer);
   clearEndgame();
   render();
 }
@@ -451,53 +454,115 @@ function spinArena() {
 
 // Field the best legal five from the 6-player squad, push it into the court slots + sixth man, and
 // re-point the frozen home arena to a starter of that club (or none, if it's been traded away).
-function applyDynastySquad(squad) {
-  const split = bestSplit(squad, state.data.seasons);
-  state.slots = split.five;
-  state.sixth = split.sixth;
-  state.dynasty.squad = [...split.five, split.sixth];
+// Order the 5-man squad into the court slots; the squad IS the starting five (Dynasty is 5v5).
+function applyDynastySquad(five) {
+  state.slots = orderFive(five);
+  state.sixth = null;
+  state.dynasty.squad = [...state.slots];
   const tc = state.dynasty.arena ? state.dynasty.arena.teamCode : null;
   const idx = state.slots.findIndex((s) => s && s._src.teamCode === tc);
   state.arenaSlot = idx >= 0 ? idx : null;
 }
 
-// Freeze the drafted home arena, field the squad, and draw the first opponent.
+// Freeze the drafted home arena, field the five, and begin the first round.
 function startGauntlet() {
   if (inGauntlet()) return;
   const a = chosenArena();
   const homeSlot = state.arenaSlot != null ? state.slots[state.arenaSlot] : null;
   const st = homeSlot ? clubStyle(homeSlot._src.teamCode) : { primary: "#888", secondary: "#555", abbr: "" };
   state.dynasty = {
-    started: true, round: 1, streak: 0, phase: "matchup",
-    squad: [...state.slots, state.sixth],
+    started: true, round: 1, streak: 0, phase: "spin",
+    squad: [...state.slots],
     arena: a ? { mult: a.mult, name: a.name, rating: a.rating, cap: a.cap, teamCode: homeSlot ? homeSlot._src.teamCode : null,
                  primary: st.primary, secondary: st.secondary, abbr: st.abbr } : null,
-    opp: null, home: true, lastGame: null, pickIn: null, pickOut: null,
+    opp: null, home: true, lastGame: null, pickIn: null, pickOut: null, recruitStep: "in", spin: null, play: null,
   };
   applyDynastySquad(state.dynasty.squad);
-  drawGauntletOpponent();
+  beginRound();
 }
 
-function drawGauntletOpponent() {
+// Draw the next opponent + home/away, then spin them into view (the reveal is half the fun).
+function beginRound() {
   const d = state.dynasty;
   d.opp = drawOpponent(state.pools, state.data.seasons, Math.random, d.round);
   d.home = Math.random() < 0.5;
-  d.lastGame = null;
+  d.lastGame = null; d.play = null;
+  animateMatchupSpin();
 }
 
-// Play the single game against the current opponent. Win → recruit; loss → the run ends.
+// Slot-machine reveal of the opponent (club + year), then a home/away flip. Updates the reel DOM
+// directly between frames; the outcome is already decided (deterministic reveal, not the draw).
+function animateMatchupSpin() {
+  clearTimeout(dynTimer);
+  const d = state.dynasty;
+  d.phase = "spin"; d.spin = { stage: "opp", landedOpp: false, landedLoc: false };
+  render();
+  const codes = [...new Set(state.pools.map((p) => p.teamCode))];
+  const years = [...new Set(state.pools.map((p) => p.season))];
+  const setReel = (club, year) => { const c = el("dyn-reel-club"), y = el("dyn-reel-year"); if (c) c.textContent = club; if (y) y.textContent = year; };
+  const setLoc = (loc, landed) => { const l = el("dyn-loc-reel"); if (l) { l.textContent = loc === "home" ? "🏠 HOME" : "✈️ AWAY"; l.className = "dyn-loc-reel " + loc + (landed ? " landed" : ""); } };
+  const NO = 24, NL = 14;
+  let i = 0;
+  const tickOpp = () => {
+    if (i >= NO) {
+      const st = clubStyle(d.opp.teamCode);
+      setReel(st.abbr, d.opp.seasonLabel);
+      const c = el("dyn-reel-club"); if (c) { c.classList.add("landed"); c.style.background = st.primary; c.style.color = textOn(st.primary); }
+      d.spin.landedOpp = true;
+      dynTimer = setTimeout(() => { i = 0; tickLoc(); }, 550);
+      return;
+    }
+    setReel(clubStyle(codes[(Math.random() * codes.length) | 0]).abbr, state.data.seasons[String(years[(Math.random() * years.length) | 0])].label);
+    i++; const t = i / NO; dynTimer = setTimeout(tickOpp, 45 + Math.pow(t, 2) * 78);
+  };
+  const tickLoc = () => {
+    if (i >= NL) { setLoc(d.home ? "home" : "away", true); dynTimer = setTimeout(() => { d.phase = "matchup"; render(); }, 850); return; }
+    setLoc(i % 2 === 0 ? "home" : "away", false);
+    i++; const t = i / NL; dynTimer = setTimeout(tickLoc, 60 + Math.pow(t, 2) * 95);
+  };
+  dynTimer = setTimeout(tickOpp, 120);
+}
+
+// Play the single game, then reveal the score quarter by quarter like a live sim.
 function playGauntletGame() {
   const d = state.dynasty;
   if (d.phase !== "matchup" || !d.opp) return;
-  const myS = squadStrength(state.slots, state.sixth, state.data.seasons);
+  clearTimeout(dynTimer);
+  const myS = squadStrength(state.slots, state.data.seasons);
   const homeMult = d.arena ? d.arena.mult : 1;
   d.lastGame = resolveGame(myS, d.opp, d.home, homeMult, Math.random);
-  if (d.lastGame.win) { d.streak++; d.phase = "recruit"; d.pickIn = null; d.pickOut = null; }
-  else { d.phase = "over"; }
+  d.phase = "playing"; d.play = { q: 0, mine: 0, theirs: 0, done: false };
   render();
+  animateScore();
 }
 
-// Commit the forced swap: one opponent player in, one of yours out, keeping a fieldable six.
+function animateScore() {
+  const d = state.dynasty, lg = d.lastGame;
+  const paint = () => {
+    const m = el("dyn-score-mine"), t = el("dyn-score-theirs"), q = el("dyn-score-q");
+    if (m) m.textContent = d.play.mine; if (t) t.textContent = d.play.theirs;
+    if (q) q.textContent = d.play.done ? "FINAL" : "Q" + d.play.q;
+    if (d.play.done) { const b = el("dyn-scoreboard"); if (b) b.classList.add(lg.win ? "won" : "lost"); const m2 = el("dyn-score-mine"), t2 = el("dyn-score-theirs"); if (lg.win && m2) m2.classList.add("lead"); if (!lg.win && t2) t2.classList.add("lead"); }
+  };
+  let q = 0;
+  const step = () => {
+    if (q >= 4) {
+      d.play.done = true; paint();
+      dynTimer = setTimeout(() => {
+        if (lg.win) { d.streak++; d.phase = "recruit"; d.recruitStep = "in"; d.pickIn = null; d.pickOut = null; }
+        else { d.phase = "over"; }
+        render();
+      }, 1500);
+      return;
+    }
+    d.play.mine += lg.quarters.mine[q]; d.play.theirs += lg.quarters.theirs[q]; d.play.q = q + 1;
+    paint(); q++;
+    dynTimer = setTimeout(step, 820);
+  };
+  dynTimer = setTimeout(step, 500);
+}
+
+// Commit the forced swap: one opponent player in, one of yours out (like-for-like on position).
 function confirmRecruit() {
   const d = state.dynasty;
   const incoming = d.opp.five.find((p) => p.playerCode === d.pickIn);
@@ -505,9 +570,7 @@ function confirmRecruit() {
   const next = d.squad.map((p, i) => (i === d.pickOut ? incoming : p));
   applyDynastySquad(next);
   d.round++;
-  d.phase = "matchup";
-  drawGauntletOpponent();
-  render();
+  beginRound();
 }
 
 /* ---------------- render ---------------- */
@@ -634,6 +697,7 @@ function renderDailyLockout(box) {
 // lights up while a player is pending, exactly like the court spots.
 function renderSixth() {
   const box = el("sixth-slot");
+  if (dynastyMode()) { box.className = "sixth-slot hidden"; box.innerHTML = ""; return; } // 5v5, no bench
   if (state.sixth) {
     const s = state.sixth, pct = Math.round(benchValue(s) * 100);
     box.className = "sixth-slot filled";
@@ -660,7 +724,7 @@ function renderControl() {
   el("control-bar").classList.toggle("hidden", (done && state.revealed) || inGauntlet());
   const info = el("pickinfo");
   if (done) info.textContent = state.revealed ? "Season played" : "Your team is set";
-  else info.innerHTML = `Pick <b>${pickedCount() + 1}</b> of 6`; // 5 starters + 1 bench, any order
+  else info.innerHTML = `Pick <b>${pickedCount() + 1}</b> of ${dynastyMode() ? 5 : 6}`; // Dynasty 5v5
   info.classList.toggle("done", done);
 
   el("spin-btn").disabled = done || !!state.offer || state.spinning || dailyLocked();
@@ -1194,85 +1258,130 @@ function renderBracket(post, res, shown) {
 
 // Left panel after the reveal: ONLY the record, the stage and the bracket, revealed in stages.
 // A small player chip: club-coloured disc + surname + position.
-function dynChip(p, teamCode, extra = "") {
-  return `<span class="dyn-chip ${extra}">${avatar(p, teamCode, "avatar sm")}` +
+function dynChip(p, teamCode) {
+  return `<span class="dyn-chip">${avatar(p, teamCode, "avatar sm")}` +
     `<span class="dyn-chip-nm">${surname(p.playerName)}</span>` +
     `<span class="dyn-chip-pos">${p.pos}</span></span>`;
 }
-const oddsClass = (p) => (p >= 0.62 ? "good" : p >= 0.45 ? "even" : "long");
+// A full stat row (name · position · box line) so recruit decisions aren't blind. `el` = "button"
+// makes it selectable; otherwise a plain div (for the "coming in" highlight).
+function dynStatRow(p, teamCode, { as = "div", cls = "", attrs = "", from = "" } = {}) {
+  const tag = as === "button" ? "button" : "div";
+  return `<${tag} class="dyn-prow ${cls}" ${attrs}>` +
+    `${avatar(p, teamCode, "avatar sm")}` +
+    `<span class="dyn-prow-id"><span class="dyn-prow-nm">${surname(p.playerName)}</span>` +
+      `<span class="dyn-prow-pos">${POS_FULL[p.pos] || p.pos}${from ? ` · ${from}` : ""}</span></span>` +
+    `<span class="dyn-prow-box">${boxLine(p)}</span>` +
+  `</${tag}>`;
+}
+
+const dynHeader = (d, note) =>
+  `<div class="dyn-head"><div class="dyn-streak">🔥 <b>${d.streak}</b> <span>streak</span></div>` +
+    `<div class="dyn-round">${note}</div></div>`;
 
 function renderDynasty(card) {
   const d = state.dynasty;
   const opp = d.opp;
   const oppName = `${badge(opp.teamCode)} <b>${prettyName(opp.teamName)}</b> <span class="muted">${opp.seasonLabel}</span>`;
-  const oppFive = opp.five.map((p) => dynChip(p, opp.teamCode)).join("");
 
-  // ---- the run ended ----
+  // ---- spinning up the next challenger + home/away ----
+  if (d.phase === "spin") {
+    card.innerHTML =
+      dynHeader(d, `Round ${d.round}`) +
+      `<div class="dyn-spin">` +
+        `<div class="dyn-spin-cap">Drawing your next challenger…</div>` +
+        `<div class="reels dyn-reels"><div class="reel-box" id="dyn-reel-club">···</div>` +
+          `<div class="reel-box year" id="dyn-reel-year">····</div></div>` +
+        `<div class="dyn-loc-reel" id="dyn-loc-reel">· · ·</div>` +
+      `</div>`;
+    return;
+  }
+
+  // ---- playing: the score reveals quarter by quarter ----
+  if (d.phase === "playing") {
+    card.innerHTML =
+      dynHeader(d, `Round ${d.round}`) +
+      `<div class="dyn-loc ${d.home ? "home" : "away"}">${d.home ? "🏠 Home — " + (d.arena ? d.arena.name : "your floor") : "✈️ Away — " + opp.arenaName}</div>` +
+      `<div class="dyn-scoreboard" id="dyn-scoreboard">` +
+        `<div class="dsb-side"><div class="dsb-team">Your five</div><div class="dsb-score" id="dyn-score-mine">0</div></div>` +
+        `<div class="dsb-mid"><div class="dsb-q" id="dyn-score-q">Q1</div></div>` +
+        `<div class="dsb-side"><div class="dsb-team">${badge(opp.teamCode)} ${clubStyle(opp.teamCode).abbr}</div><div class="dsb-score" id="dyn-score-theirs">0</div></div>` +
+      `</div>`;
+    return;
+  }
+
+  // ---- the run ended: streak + the same weakest-link readout Classic gives ----
   if (d.phase === "over") {
     const lg = d.lastGame;
+    const res = projectRecord(state.slots, state.data.seasons, undefined, 1, null, null);
     card.innerHTML =
       `<div class="dyn-over">` +
         `<div class="dyn-over-label">Run over</div>` +
         `<div class="dyn-streak-big">🔥 ${d.streak}</div>` +
         `<div class="dyn-streak-cap">win streak</div>` +
         `<div class="dyn-scoreline loss">Lost ${lg.theirs}–${lg.mine} · fell to ${oppName}</div>` +
-        `<div class="dyn-over-sub">${d.streak === 0 ? "Even a dynasty starts with one win. Go again." : d.streak >= 12 ? "A legendary run." : d.streak >= 6 ? "A proud dynasty." : "The gauntlet is unforgiving. Again?"}</div>` +
+        `<div class="result-cats-wrap"><div class="rc-head">Where your dynasty ended up</div>` +
+          `<div class="result-cats">${catBarsHTML(res)}</div>` +
+          `<div class="rc-gate">${GATE_PHRASE[res.gateCategory] || ""}</div>` +
+        `</div>` +
         `<button id="dyn-again" class="play-btn">↻ New dynasty</button>` +
       `</div>`;
     el("dyn-again").addEventListener("click", () => reset());
     return;
   }
 
-  // ---- just won: the forced recruit ----
-  if (d.phase === "recruit") {
+  // ---- recruit STEP 1: pick one of their players (with full stats) ----
+  if (d.phase === "recruit" && d.recruitStep === "in") {
     const lg = d.lastGame;
-    const incoming = d.pickIn ? opp.five.find((p) => p.playerCode === d.pickIn) : null;
-    const inList = opp.five.map((p) => {
+    const rows = opp.five.map((p) => {
       const owned = d.squad.some((s) => s.playerCode === p.playerCode);
-      const sel = d.pickIn === p.playerCode;
-      return `<button class="dyn-pick in${sel ? " sel" : ""}" data-in="${p.playerCode}" ${owned ? "disabled title='Already yours'" : ""}>` +
-        dynChip(p, opp.teamCode) + `</button>`;
+      return dynStatRow(p, opp.teamCode, { as: "button", cls: owned ? "owned" : "", attrs: `data-in="${p.playerCode}" ${owned ? "disabled title='Already yours'" : ""}` });
     }).join("");
-    const outList = d.squad.map((p, i) => {
-      const legal = incoming ? canSwap(d.squad, incoming, i) : true;
-      const sel = d.pickOut === i;
-      return `<button class="dyn-pick out${sel ? " sel" : ""}" data-out="${i}" ${incoming && !legal ? "disabled title='Would break your line-up'" : ""}>` +
-        dynChip(p, p._src.teamCode) + `</button>`;
-    }).join("");
-    const ready = incoming && d.pickOut != null && canSwap(d.squad, incoming, d.pickOut);
     card.innerHTML =
-      `<div class="dyn-head"><div class="dyn-streak">🔥 <b>${d.streak}</b> <span>streak</span></div>` +
-        `<div class="dyn-round">Round ${d.round} won</div></div>` +
+      dynHeader(d, `Round ${d.round} won`) +
       `<div class="dyn-scoreline win">Beat ${oppName} ${lg.mine}–${lg.theirs}</div>` +
-      `<h3 class="dyn-loot">Loot the vanquished</h3>` +
-      `<p class="dyn-sub">Take one of their players — and release one of yours. Your starting five must stay legal (2G · 2F · 1C).</p>` +
-      `<div class="dyn-recruit">` +
-        `<div class="dyn-col"><div class="dyn-col-head in">Recruit</div>${inList}</div>` +
-        `<div class="dyn-col"><div class="dyn-col-head out">Release</div>${outList}</div>` +
-      `</div>` +
-      `<button id="dyn-confirm" class="play-btn" ${ready ? "" : "disabled"}>Confirm swap →</button>`;
+      `<h3 class="dyn-loot">Pick 1 player</h3>` +
+      `<p class="dyn-sub">Recruit one from ${prettyName(opp.teamName)} — you'll choose who to release next.</p>` +
+      `<div class="dyn-plist">${rows}</div>`;
     card.querySelectorAll("[data-in]").forEach((b) =>
-      b.addEventListener("click", () => { d.pickIn = b.dataset.in; if (d.pickOut != null) { const inc = opp.five.find((p) => p.playerCode === d.pickIn); if (!canSwap(d.squad, inc, d.pickOut)) d.pickOut = null; } render(); }));
+      b.addEventListener("click", () => { d.pickIn = b.dataset.in; d.pickOut = null; d.recruitStep = "out"; render(); }));
+    return;
+  }
+
+  // ---- recruit STEP 2: choose who to release (same position), stats side by side ----
+  if (d.phase === "recruit" && d.recruitStep === "out") {
+    const incoming = opp.five.find((p) => p.playerCode === d.pickIn);
+    const rows = d.squad.map((p, i) => {
+      const legal = canSwap(d.squad, incoming, i);
+      const sel = d.pickOut === i;
+      return dynStatRow(p, p._src.teamCode, { as: "button", cls: "out" + (sel ? " sel" : ""), attrs: `data-out="${i}" ${legal ? "" : "disabled title='Different position — pick a " + (POS_FULL[incoming.pos] || incoming.pos) + "'"}`, from: `${clubStyle(p._src.teamCode).abbr} ${p._src.seasonLabel}` });
+    }).join("");
+    const ready = d.pickOut != null && canSwap(d.squad, incoming, d.pickOut);
+    card.innerHTML =
+      dynHeader(d, `Round ${d.round} won`) +
+      `<div class="dyn-incoming"><span class="dyn-in-tag">Coming in</span>` +
+        dynStatRow(incoming, opp.teamCode, { cls: "in", from: `${clubStyle(opp.teamCode).abbr} ${opp.seasonLabel}` }) + `</div>` +
+      `<h3 class="dyn-loot">Release a ${POS_FULL[incoming.pos] || incoming.pos}</h3>` +
+      `<p class="dyn-sub">Your ${incoming.pos === "C" ? "centre" : POS_FULL[incoming.pos].toLowerCase()}${incoming.pos === "G" || incoming.pos === "F" ? "s make" : " makes"} way — pick who.</p>` +
+      `<div class="dyn-plist">${rows}</div>` +
+      `<div class="dyn-actions"><button id="dyn-back" class="mini-btn">← Change pick</button>` +
+        `<button id="dyn-confirm" class="play-btn" ${ready ? "" : "disabled"}>Confirm swap →</button></div>`;
     card.querySelectorAll("[data-out]").forEach((b) =>
       b.addEventListener("click", () => { d.pickOut = Number(b.dataset.out); render(); }));
+    el("dyn-back").addEventListener("click", () => { d.recruitStep = "in"; d.pickOut = null; render(); });
     el("dyn-confirm").addEventListener("click", confirmRecruit);
     return;
   }
 
-  // ---- the next matchup ----
-  const myS = squadStrength(state.slots, state.sixth, state.data.seasons);
-  const p = winProbability(myS, opp, d.home, d.arena ? d.arena.mult : 1);
-  const pct = Math.round(p * 100);
+  // ---- the next matchup (opponent + home/away already spun in) ----
   card.innerHTML =
-    `<div class="dyn-head"><div class="dyn-streak">🔥 <b>${d.streak}</b> <span>streak</span></div>` +
-      `<div class="dyn-round">Round ${d.round}</div></div>` +
+    dynHeader(d, `Round ${d.round}`) +
     `<div class="dyn-loc ${d.home ? "home" : "away"}">${d.home ? "🏠 Home — " + (d.arena ? d.arena.name : "your floor") : "✈️ Away — " + opp.arenaName}</div>` +
     `<div class="dyn-matchup">` +
       `<div class="dyn-opp-head">Next up</div>` +
       `<div class="dyn-opp-name">${oppName}</div>` +
-      `<div class="dyn-opp-five">${oppFive}</div>` +
+      `<div class="dyn-opp-five">${opp.five.map((p) => dynChip(p, opp.teamCode)).join("")}</div>` +
     `</div>` +
-    `<div class="dyn-odds ${oddsClass(p)}"><span class="dyn-odds-pct">${pct}%</span> <span class="dyn-odds-lbl">win chance</span></div>` +
     `<button id="dyn-play" class="play-btn">▶ Play the game</button>`;
   el("dyn-play").addEventListener("click", playGauntletGame);
 }

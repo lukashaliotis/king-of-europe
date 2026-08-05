@@ -90,7 +90,18 @@ export function winProbability(myS, opp, home, homeMult) {
   return Math.max(0.02, Math.min(0.98, gameProbability(myS, opp.effS) * mult));
 }
 
-// A plausible EuroLeague final score for flavour, consistent with who won and how one-sided it was.
+// Split a team's total into 4 quarter buckets (exact sum) so the score can be revealed quarter by
+// quarter like a live game — with lead changes, not a monotone climb.
+function splitQuarters(total, rng) {
+  const base = total / 4, q = [];
+  let acc = 0;
+  for (let i = 0; i < 3; i++) { const v = Math.max(9, Math.round(base + (rng() - 0.5) * 9)); q.push(v); acc += v; }
+  q.push(Math.max(7, total - acc));
+  return q;
+}
+
+// A plausible EuroLeague final score for flavour, consistent with who won and how one-sided it was,
+// plus per-quarter splits for the simulated reveal.
 function scoreline(win, p, rng) {
   const total = 150 + Math.floor(rng() * 26);            // 150–175 combined
   let margin = 1 + Math.round(Math.abs(p - 0.5) * 34 + rng() * 9); // bigger edge → bigger margin
@@ -99,7 +110,7 @@ function scoreline(win, p, rng) {
   let theirs = total - mine;
   if (win && mine <= theirs) { mine = theirs + 1 + Math.floor(rng() * 3); theirs = total - mine; }
   if (!win && theirs <= mine) { theirs = mine + 1 + Math.floor(rng() * 3); mine = total - theirs; }
-  return { mine, theirs };
+  return { mine, theirs, quarters: { mine: splitQuarters(mine, rng), theirs: splitQuarters(theirs, rng) } };
 }
 
 export function resolveGame(myS, opp, home, homeMult, rng) {
@@ -108,32 +119,22 @@ export function resolveGame(myS, opp, home, homeMult, rng) {
   return { win, p, ...scoreline(win, p, rng) };
 }
 
-/* ---------------- the squad + the forced recruit ---------------- */
+/* ---------------- the squad + the forced recruit (5v5) ---------------- */
 
-// Field the best legal five (2G/2F/1C) from a 6-player squad; the leftover is the sixth man. Returns
-// the five ORDERED to the court slots [PG,SG,SF,PF,C] = [G,G,F,F,C].
-export function bestSplit(squad, seasons) {
-  let bestS = -Infinity, five = null, sixth = null;
-  for (let i = 0; i < squad.length; i++) {
-    const cand = squad.filter((_, j) => j !== i);
-    if (!legalFive(cand)) continue;
-    const s = Sof(cand, seasons, squad[i]);
-    if (s > bestS) { bestS = s; five = cand; sixth = squad[i]; }
-  }
-  if (!five) return null;
+// Order a legal five (2G/2F/1C) into the court slots [PG,SG,SF,PF,C] = [G,G,F,F,C].
+export function orderFive(five) {
   const g = five.filter((p) => p.pos === "G"), f = five.filter((p) => p.pos === "F"), c = five.filter((p) => p.pos === "C");
-  return { five: [g[0], g[1], f[0], f[1], c[0]], sixth, S: bestS };
+  return [g[0], g[1], f[0], f[1], c[0]];
 }
 
-// Is swapping `incoming` in for squad[outIndex] legal? The six must still field a 2G/2F/1C five and
-// carry no duplicate player.
-export function canSwap(squad, incoming, outIndex) {
+// Is swapping `incoming` in for five[outIndex] legal? A five is exactly 2G/2F/1C, so the swap must be
+// like-for-like on position (take their centre → drop yours) and introduce no duplicate.
+export function canSwap(five, incoming, outIndex) {
   if (outIndex == null || !incoming) return false;
-  const next = squad.map((p, i) => (i === outIndex ? incoming : p));
+  const next = five.map((p, i) => (i === outIndex ? incoming : p));
   const seen = new Set();
   for (const p of next) { if (seen.has(p.playerCode)) return false; seen.add(p.playerCode); }
-  const c = counts(next);
-  return c.G >= 2 && c.F >= 2 && c.C >= 1;
+  return legalFive(next);
 }
 
-export const squadStrength = (five, sixth, seasons) => Sof(five, seasons, sixth);
+export const squadStrength = (five, seasons) => Sof(five, seasons);
