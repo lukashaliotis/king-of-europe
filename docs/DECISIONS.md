@@ -369,9 +369,10 @@ streak," not "34-4." Locked design (user, this session):
     opponent's effective strength (`oppEff = oppBestFiveS + esc·(r−1)`), exactly like the postseason
     seed handicap, so even a superteam eventually falls.
   - **Locked (initial):** draw floor `F0=3, slope=1.0`, cap `Fmax≈13.4` (opp p95), home/away
-    `±4.5%` (real arena mult), **`esc=1.3`** → EXPERT median 3, p75 7, **p90 11, p95 13**, max ~21;
-    CASUAL median 2, p90 5. Re-verify in the phase-3 pass once the loop is played (the model assumes
-    perfect greedy recruit + a flat ±4% edge; real numbers may shift).
+    `±4.5%` (real arena mult), **`esc=1.1`** → EXPERT median 4, p75 8, **p90 12, p95 15**, max ~23;
+    CASUAL median 2, p90 6. Chosen over the harder `esc=1.3` (p95 13) so the **exceptional run reaches
+    ~15** and the leaderboard spreads out (user). Re-verify in the phase-3 pass once the loop is played
+    (the model assumes perfect greedy recruit + a flat ±4% edge; real numbers may shift).
 - **Two leaderboards (phase 4):** a **Weekly** shared-seed gauntlet (everyone faces the identical
   opponents + home/away — most viral, friends compare the exact run) and an **All-time best streak.**
   Both **server-verified** by re-simming the run (extend the resolve.js / Pages Functions / D1

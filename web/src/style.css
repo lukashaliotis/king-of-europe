@@ -744,3 +744,53 @@ body[data-revealed="1"] #place-hint, body[data-picking="1"] #place-hint { displa
   /* the affiliation disclaimer is REQUIRED — shrink it, never hide it */
   .footnote { font-size: 0.6rem; padding: 0 1rem 0.3rem; line-height: 1.3; }
 }
+
+/* ---------------- Dynasty gauntlet ---------------- */
+.avatar.sm { width: 22px; height: 22px; font-size: 0.6rem; }
+.dyn-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.7rem; }
+.dyn-streak { display: flex; align-items: baseline; gap: 0.35rem; font-size: 1.15rem; }
+.dyn-streak b { font-size: 1.5rem; color: var(--accent); }
+.dyn-streak span { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.dyn-round { font-weight: 700; color: var(--muted); font-size: 0.9rem; }
+.dyn-loc { text-align: center; font-weight: 700; font-size: 0.9rem; padding: 0.4rem; border-radius: 10px; margin-bottom: 0.8rem; }
+.dyn-loc.home { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+.dyn-loc.away { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+.dyn-matchup { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.85rem; text-align: center; }
+.dyn-opp-head { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.35rem; }
+.dyn-opp-name { font-size: 1.05rem; margin-bottom: 0.65rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; flex-wrap: wrap; }
+.dyn-opp-name .badge { width: 34px; height: 34px; font-size: 0.85rem; border-radius: 9px; }
+.dyn-opp-five { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; }
+.dyn-chip { display: inline-flex; align-items: center; gap: 0.3rem; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 0.15rem 0.5rem 0.15rem 0.15rem; font-size: 0.82rem; }
+.dyn-chip-nm { font-weight: 600; }
+.dyn-chip-pos { font-size: 0.62rem; color: var(--muted); font-weight: 700; }
+.dyn-odds { text-align: center; margin: 0.9rem 0 0.2rem; }
+.dyn-odds-pct { font-size: 1.6rem; font-weight: 800; }
+.dyn-odds-lbl { font-size: 0.8rem; color: var(--muted); }
+.dyn-odds.good .dyn-odds-pct { color: var(--good); }
+.dyn-odds.even .dyn-odds-pct { color: var(--gate); }
+.dyn-odds.long .dyn-odds-pct { color: var(--bad); }
+#dyn-play, #dyn-confirm, #dyn-again { display: block; width: 100%; margin-top: 0.9rem; }
+
+/* recruit picker */
+.dyn-scoreline { text-align: center; font-weight: 700; padding: 0.5rem; border-radius: 10px; margin-bottom: 0.7rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; flex-wrap: wrap; }
+.dyn-scoreline.win { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+.dyn-scoreline.loss { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+.dyn-loot { text-align: center; margin: 0.2rem 0 0.2rem; }
+.dyn-sub { text-align: center; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.8rem; }
+.dyn-recruit { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+.dyn-col { display: flex; flex-direction: column; gap: 0.4rem; }
+.dyn-col-head { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 800; text-align: center; padding-bottom: 0.2rem; }
+.dyn-col-head.in { color: var(--good); }
+.dyn-col-head.out { color: var(--bad); }
+.dyn-pick { background: var(--panel-2); border: 1.5px solid var(--line); border-radius: 10px; padding: 0.3rem; cursor: pointer; text-align: left; transition: border-color 0.12s, background 0.12s; }
+.dyn-pick:hover:not(:disabled) { border-color: var(--muted); }
+.dyn-pick.in.sel { border-color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
+.dyn-pick.out.sel { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.dyn-pick:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* run over */
+.dyn-over { text-align: center; padding: 1.2rem 0.5rem; }
+.dyn-over-label { text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-size: 0.8rem; }
+.dyn-streak-big { font-size: 3.4rem; font-weight: 900; color: var(--accent); line-height: 1.1; }
+.dyn-streak-cap { text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-size: 0.8rem; margin-bottom: 0.9rem; }
+.dyn-over-sub { color: var(--muted); font-size: 0.9rem; margin: 0.8rem 0; }

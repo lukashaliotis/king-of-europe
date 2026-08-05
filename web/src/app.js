@@ -15,6 +15,7 @@ import {
 } from "./versus.js";
 import { SALARY_CAP, FLOOR as SALARY_FLOOR, playerCost, canAfford, formatMoney } from "./salary.js";
 import { getIdentity, saveName, submitDaily, fetchLeaderboard } from "./leaderboard.js";
+import { DYN, drawOpponent, resolveGame, winProbability, bestSplit, canSwap, squadStrength } from "./dynasty.js";
 
 const LEGENDS = legendsPool();
 
@@ -72,6 +73,7 @@ const state = {
   versusOpponent: null, // reconstructed challenger's team (responder only)
   versusResult: null,   // { code } for the challenger, or the duel outcome for the responder
   versusError: null,
+  dynasty: null,     // the gauntlet run: { started, round, streak, phase, squad, opp, home, arena, lastGame, pickIn, pickOut }
 };
 let dragging = null;
 let spinTimer = null;
@@ -211,6 +213,13 @@ const isDup = (player) => filled().some((s) => s.playerCode === player.playerCod
 const sixthOpen = () => !state.sixth;
 const hasRoomFor = (player) => openSlotsFor(player.pos).length > 0 || sixthOpen();
 
+/* ---------------- mode helpers ---------------- */
+const dynastyMode = () => state.mode === "dynasty";
+const inGauntlet = () => dynastyMode() && !!state.dynasty && state.dynasty.started;
+// The Dynasty draft is UNWEIGHTED — no √top-5 bias toward strong clubs — so you start modest and
+// EARN your dynasty by looting, rather than being handed a strong squad (see docs/DECISIONS.md §15).
+const spinUniform = (pools) => pools[Math.floor(Math.random() * pools.length)];
+
 /* ---------------- salary cap ---------------- */
 const salaryMode = () => state.mode === "salary";
 const priceOf = (p) => playerCost(p, state.data.seasons);
@@ -248,6 +257,8 @@ function doSpin(mode) {
     } else if (state.mode === "versus") {
       target = state.versusBoard[pickedCount()]; // the matchup's shared draw
       if (!target) return;
+    } else if (state.mode === "dynasty") {
+      target = spinUniform(state.pools); // unweighted draft, no legends — start modest
     } else {
       // rare nugget: sometimes the main spin lands the European Legends instead of a club
       target = Math.random() < LEGENDS_CHANCE ? LEGENDS : spin(state.pools);
@@ -350,6 +361,7 @@ function reset() {
   state.offer = null; state.pending = null;
   state.respins = { club: true, year: true, both: true };
   state.sixth = null;
+  state.dynasty = null;
   clearEndgame();
   render();
 }
@@ -364,7 +376,12 @@ function arenaInfoFor(slotIdx) {
   return { ...base, count, share: count / 5, mult: 1 + (base.mult - 1) * (count / 5) };
 }
 const chosenArena = () => (state.arenaSlot !== null ? arenaInfoFor(state.arenaSlot) : null);
-const arenaMult = () => { const a = chosenArena(); return a ? a.mult : 1; };
+// In Dynasty the home arena is FROZEN at draft (your building for the whole run), independent of the
+// squad churning underneath it via recruits.
+const arenaMult = () => {
+  if (inGauntlet() && state.dynasty.arena) return state.dynasty.arena.mult;
+  const a = chosenArena(); return a ? a.mult : 1;
+};
 const coachOptions = () => eligibleCoaches([...filled(), state.sixth].filter(Boolean), state.data);
 const chosenCoach = () => (state.coachName ? coachOptions().find((e) => e.coach.name === state.coachName) || null : null);
 const coachCatDeltas = () => { const c = chosenCoach(); return c ? coachDeltas(c) : null; };
@@ -413,7 +430,11 @@ function spinArena() {
         state.arenaRolling = false; state.arenaSlot = target; state.arenaSpun = true; state.arenaRevealing = true;
         render();
         setTimeout(() => { state.courtRevealed = true; render(); }, 550);
-        setTimeout(() => { state.arenaRevealing = false; render(); }, 2100);
+        setTimeout(() => {
+          state.arenaRevealing = false;
+          if (dynastyMode()) startGauntlet(); // no coach in Dynasty — the run begins
+          render();
+        }, 2100);
       }, 260);
       return;
     }
@@ -424,6 +445,69 @@ function spinArena() {
     spinTimer = setTimeout(tick, delay);
   };
   tick();
+}
+
+/* ---------------- Dynasty gauntlet ---------------- */
+
+// Field the best legal five from the 6-player squad, push it into the court slots + sixth man, and
+// re-point the frozen home arena to a starter of that club (or none, if it's been traded away).
+function applyDynastySquad(squad) {
+  const split = bestSplit(squad, state.data.seasons);
+  state.slots = split.five;
+  state.sixth = split.sixth;
+  state.dynasty.squad = [...split.five, split.sixth];
+  const tc = state.dynasty.arena ? state.dynasty.arena.teamCode : null;
+  const idx = state.slots.findIndex((s) => s && s._src.teamCode === tc);
+  state.arenaSlot = idx >= 0 ? idx : null;
+}
+
+// Freeze the drafted home arena, field the squad, and draw the first opponent.
+function startGauntlet() {
+  if (inGauntlet()) return;
+  const a = chosenArena();
+  const homeSlot = state.arenaSlot != null ? state.slots[state.arenaSlot] : null;
+  const st = homeSlot ? clubStyle(homeSlot._src.teamCode) : { primary: "#888", secondary: "#555", abbr: "" };
+  state.dynasty = {
+    started: true, round: 1, streak: 0, phase: "matchup",
+    squad: [...state.slots, state.sixth],
+    arena: a ? { mult: a.mult, name: a.name, rating: a.rating, cap: a.cap, teamCode: homeSlot ? homeSlot._src.teamCode : null,
+                 primary: st.primary, secondary: st.secondary, abbr: st.abbr } : null,
+    opp: null, home: true, lastGame: null, pickIn: null, pickOut: null,
+  };
+  applyDynastySquad(state.dynasty.squad);
+  drawGauntletOpponent();
+}
+
+function drawGauntletOpponent() {
+  const d = state.dynasty;
+  d.opp = drawOpponent(state.pools, state.data.seasons, Math.random, d.round);
+  d.home = Math.random() < 0.5;
+  d.lastGame = null;
+}
+
+// Play the single game against the current opponent. Win → recruit; loss → the run ends.
+function playGauntletGame() {
+  const d = state.dynasty;
+  if (d.phase !== "matchup" || !d.opp) return;
+  const myS = squadStrength(state.slots, state.sixth, state.data.seasons);
+  const homeMult = d.arena ? d.arena.mult : 1;
+  d.lastGame = resolveGame(myS, d.opp, d.home, homeMult, Math.random);
+  if (d.lastGame.win) { d.streak++; d.phase = "recruit"; d.pickIn = null; d.pickOut = null; }
+  else { d.phase = "over"; }
+  render();
+}
+
+// Commit the forced swap: one opponent player in, one of yours out, keeping a fieldable six.
+function confirmRecruit() {
+  const d = state.dynasty;
+  const incoming = d.opp.five.find((p) => p.playerCode === d.pickIn);
+  if (!incoming || d.pickOut == null || !canSwap(d.squad, incoming, d.pickOut)) return;
+  const next = d.squad.map((p, i) => (i === d.pickOut ? incoming : p));
+  applyDynastySquad(next);
+  d.round++;
+  d.phase = "matchup";
+  drawGauntletOpponent();
+  render();
 }
 
 /* ---------------- render ---------------- */
@@ -573,7 +657,7 @@ function renderControl() {
   const done = complete();
   // Once the season is revealed the spin bar is dead weight — hide it so the result/bracket claims
   // that vertical space and fits without scrolling.
-  el("control-bar").classList.toggle("hidden", done && state.revealed);
+  el("control-bar").classList.toggle("hidden", (done && state.revealed) || inGauntlet());
   const info = el("pickinfo");
   if (done) info.textContent = state.revealed ? "Season played" : "Your team is set";
   else info.innerHTML = `Pick <b>${pickedCount() + 1}</b> of 6`; // 5 starters + 1 bench, any order
@@ -602,6 +686,14 @@ function renderVenue() {
     return;
   }
   box.className = "venue";
+  // Dynasty: the home arena is frozen for the whole run (independent of the churning squad).
+  if (inGauntlet() && state.dynasty.arena) {
+    const ar = state.dynasty.arena;
+    box.innerHTML = `<div class="venue-head">Home arena</div>` +
+      arenaSVG(ar.primary, ar.secondary, ar.rating, ar.cap) +
+      `<div class="venue-name">${ar.name} <span class="flames">${arenaFlames(ar.rating)}</span></div>`;
+    return;
+  }
   if (!state.arenaSpun) { box.innerHTML = `<div class="venue-idle">🏟 Spin for your home arena →</div>`; return; }
   const cur = chosenArena();
   const st = clubStyle(state.slots[state.arenaSlot]._src.teamCode);
@@ -615,6 +707,7 @@ function renderBench() {
   const box = el("bench");
   // hidden entirely until it's live — the venue line above already says it's coming
   if (!complete() || !state.arenaSpun) { box.className = "bench hidden"; box.innerHTML = ""; return; }
+  if (dynastyMode()) { box.className = "bench hidden"; box.innerHTML = ""; return; } // Dynasty has no coach
   box.className = "bench";
   const co = chosenCoach();
   if (!co) {
@@ -814,6 +907,13 @@ function renderCommit() {
     box.innerHTML = `<div class="commit-inner arena-reveal"><div class="ar-reveal-head">Your home floor</div>` +
       `<div class="ar-reveal-art">${arenaSVG(st.primary, st.secondary, cur.rating, cur.cap)}</div>` +
       `<div class="ar-reveal-name">${cur.name} <span class="flames">${arenaFlames(cur.rating)}</span></div></div>`;
+    return;
+  }
+
+  // Dynasty has no coach step — once the home arena is set the gauntlet begins (in the result-card).
+  if (dynastyMode()) {
+    if (!inGauntlet()) startGauntlet();
+    box.classList.add("hidden");
     return;
   }
 
@@ -1093,8 +1193,93 @@ function renderBracket(post, res, shown) {
 }
 
 // Left panel after the reveal: ONLY the record, the stage and the bracket, revealed in stages.
+// A small player chip: club-coloured disc + surname + position.
+function dynChip(p, teamCode, extra = "") {
+  return `<span class="dyn-chip ${extra}">${avatar(p, teamCode, "avatar sm")}` +
+    `<span class="dyn-chip-nm">${surname(p.playerName)}</span>` +
+    `<span class="dyn-chip-pos">${p.pos}</span></span>`;
+}
+const oddsClass = (p) => (p >= 0.62 ? "good" : p >= 0.45 ? "even" : "long");
+
+function renderDynasty(card) {
+  const d = state.dynasty;
+  const opp = d.opp;
+  const oppName = `${badge(opp.teamCode)} <b>${prettyName(opp.teamName)}</b> <span class="muted">${opp.seasonLabel}</span>`;
+  const oppFive = opp.five.map((p) => dynChip(p, opp.teamCode)).join("");
+
+  // ---- the run ended ----
+  if (d.phase === "over") {
+    const lg = d.lastGame;
+    card.innerHTML =
+      `<div class="dyn-over">` +
+        `<div class="dyn-over-label">Run over</div>` +
+        `<div class="dyn-streak-big">🔥 ${d.streak}</div>` +
+        `<div class="dyn-streak-cap">win streak</div>` +
+        `<div class="dyn-scoreline loss">Lost ${lg.theirs}–${lg.mine} · fell to ${oppName}</div>` +
+        `<div class="dyn-over-sub">${d.streak === 0 ? "Even a dynasty starts with one win. Go again." : d.streak >= 12 ? "A legendary run." : d.streak >= 6 ? "A proud dynasty." : "The gauntlet is unforgiving. Again?"}</div>` +
+        `<button id="dyn-again" class="play-btn">↻ New dynasty</button>` +
+      `</div>`;
+    el("dyn-again").addEventListener("click", () => reset());
+    return;
+  }
+
+  // ---- just won: the forced recruit ----
+  if (d.phase === "recruit") {
+    const lg = d.lastGame;
+    const incoming = d.pickIn ? opp.five.find((p) => p.playerCode === d.pickIn) : null;
+    const inList = opp.five.map((p) => {
+      const owned = d.squad.some((s) => s.playerCode === p.playerCode);
+      const sel = d.pickIn === p.playerCode;
+      return `<button class="dyn-pick in${sel ? " sel" : ""}" data-in="${p.playerCode}" ${owned ? "disabled title='Already yours'" : ""}>` +
+        dynChip(p, opp.teamCode) + `</button>`;
+    }).join("");
+    const outList = d.squad.map((p, i) => {
+      const legal = incoming ? canSwap(d.squad, incoming, i) : true;
+      const sel = d.pickOut === i;
+      return `<button class="dyn-pick out${sel ? " sel" : ""}" data-out="${i}" ${incoming && !legal ? "disabled title='Would break your line-up'" : ""}>` +
+        dynChip(p, p._src.teamCode) + `</button>`;
+    }).join("");
+    const ready = incoming && d.pickOut != null && canSwap(d.squad, incoming, d.pickOut);
+    card.innerHTML =
+      `<div class="dyn-head"><div class="dyn-streak">🔥 <b>${d.streak}</b> <span>streak</span></div>` +
+        `<div class="dyn-round">Round ${d.round} won</div></div>` +
+      `<div class="dyn-scoreline win">Beat ${oppName} ${lg.mine}–${lg.theirs}</div>` +
+      `<h3 class="dyn-loot">Loot the vanquished</h3>` +
+      `<p class="dyn-sub">Take one of their players — and release one of yours. Your starting five must stay legal (2G · 2F · 1C).</p>` +
+      `<div class="dyn-recruit">` +
+        `<div class="dyn-col"><div class="dyn-col-head in">Recruit</div>${inList}</div>` +
+        `<div class="dyn-col"><div class="dyn-col-head out">Release</div>${outList}</div>` +
+      `</div>` +
+      `<button id="dyn-confirm" class="play-btn" ${ready ? "" : "disabled"}>Confirm swap →</button>`;
+    card.querySelectorAll("[data-in]").forEach((b) =>
+      b.addEventListener("click", () => { d.pickIn = b.dataset.in; if (d.pickOut != null) { const inc = opp.five.find((p) => p.playerCode === d.pickIn); if (!canSwap(d.squad, inc, d.pickOut)) d.pickOut = null; } render(); }));
+    card.querySelectorAll("[data-out]").forEach((b) =>
+      b.addEventListener("click", () => { d.pickOut = Number(b.dataset.out); render(); }));
+    el("dyn-confirm").addEventListener("click", confirmRecruit);
+    return;
+  }
+
+  // ---- the next matchup ----
+  const myS = squadStrength(state.slots, state.sixth, state.data.seasons);
+  const p = winProbability(myS, opp, d.home, d.arena ? d.arena.mult : 1);
+  const pct = Math.round(p * 100);
+  card.innerHTML =
+    `<div class="dyn-head"><div class="dyn-streak">🔥 <b>${d.streak}</b> <span>streak</span></div>` +
+      `<div class="dyn-round">Round ${d.round}</div></div>` +
+    `<div class="dyn-loc ${d.home ? "home" : "away"}">${d.home ? "🏠 Home — " + (d.arena ? d.arena.name : "your floor") : "✈️ Away — " + opp.arenaName}</div>` +
+    `<div class="dyn-matchup">` +
+      `<div class="dyn-opp-head">Next up</div>` +
+      `<div class="dyn-opp-name">${oppName}</div>` +
+      `<div class="dyn-opp-five">${oppFive}</div>` +
+    `</div>` +
+    `<div class="dyn-odds ${oddsClass(p)}"><span class="dyn-odds-pct">${pct}%</span> <span class="dyn-odds-lbl">win chance</span></div>` +
+    `<button id="dyn-play" class="play-btn">▶ Play the game</button>`;
+  el("dyn-play").addEventListener("click", playGauntletGame);
+}
+
 function renderResult() {
   const card = el("result-card");
+  if (inGauntlet()) { card.classList.remove("hidden"); renderDynasty(card); return; }
   if (!complete() || !state.revealed) { card.classList.add("hidden"); return; }
   if (state.mode === "versus") { renderVersusResult(card); return; }
   const res = projectRecord(state.slots, state.data.seasons, undefined, arenaMult(), coachCatDeltas(), state.sixth);
