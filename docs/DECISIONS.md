@@ -332,3 +332,52 @@ decode (ephemeral, acceptable).
   category by its spread, not just centre its mean).
 - **Championship rate:** measure the true title rate (with coach+arena+6th); if >~10%, toughen the
   Final Four / Final opponents rather than the regular season.
+
+## 15. Dynasty (new mode — in build)
+
+A roguelike **gauntlet**: build a squad, then survive an endless run of single games against ever-
+stronger clubs, **looting one player from every team you beat**. Your **win streak is the score**.
+The snowball (recruit as you win) is the hook; a great run should read as "Lukas went on a 13-win
+streak," not "34-4." Locked design (user, this session):
+
+- **Start — uniform-spin draft, no coach.** Same draft UI as Classic, but the spin is **UNWEIGHTED**
+  (ignore `pool.weight`) so you start with a *modest, representative* squad and *earn* your dynasty by
+  looting — rather than being nudged toward strong clubs (the √top-5 bias other modes use, `data.js:80`).
+  Squad = **6 players: 5 legal starters (2G/2F/1C) + 1 sixth man.** No coach layer in v1 (keeps every
+  recruit decision clean; arena/home stays). Then spin your **home arena** as in Classic.
+- **Gauntlet, one game per opponent.** Each round *r*: spin an opponent club-year whose best legal five
+  clears a **rising strength floor F(r)**; roll **home/away** (home → your arena edge, away → their
+  arena edge, ~±4.5% on win prob); play **one seeded game** at `p = gameProbability(myS, oppS)` ± the
+  home edge. Win → streak++ and recruit; **first loss ends the run.** Single game (not a series) keeps
+  the streak count clean and every round genuinely tense — an 88% favourite still loses sometimes,
+  which *is* the roguelike.
+- **Forced recruit-and-replace** (the heart). Beat a team → you **must** take exactly one of their
+  players **and cut one of yours** (1 in, 1 out, squad stays 6). Your **starting five must stay legal
+  (2G/2F/1C)**; the sixth man is any position. Poaching their centre often forces you to drop *your*
+  centre, or take a guard you don't need and bench a star to stay legal — that **positional squeeze**
+  is the difficulty, and it sharpens as opponents strengthen.
+- **Split-court visual (phase 2):** your five on one half, the opponent's on the other; after the
+  home/away spin the **whole court tints to the home team's colour** (as now), and the **simulated
+  final score animates in above the court.**
+- **Difficulty target:** endless, single-elimination; a **great run (p90) ~10-15, tuned a touch
+  harder.** The opponent ramp F(r) + home edge are calibrated **empirically** against real rosters in
+  `sim/dynasty_calib.mjs` (model: uniform draft, greedy recruit-and-cut, single game vs a rising floor),
+  never by eye — same rule as the win curve.
+  - **Key finding:** opponents are capped at real-roster strength (best-five S: p50≈4.9, p90≈11.4,
+    max≈21.9) but a looted squad grows past 30, so real rosters ALONE can't end a great run — a
+    perfect-play run went to the 60-round cap. Fix = a **per-round ESCALATION** handicap on the
+    opponent's effective strength (`oppEff = oppBestFiveS + esc·(r−1)`), exactly like the postseason
+    seed handicap, so even a superteam eventually falls.
+  - **Locked (initial):** draw floor `F0=3, slope=1.0`, cap `Fmax≈13.4` (opp p95), home/away
+    `±4.5%` (real arena mult), **`esc=1.3`** → EXPERT median 3, p75 7, **p90 11, p95 13**, max ~21;
+    CASUAL median 2, p90 5. Re-verify in the phase-3 pass once the loop is played (the model assumes
+    perfect greedy recruit + a flat ±4% edge; real numbers may shift).
+- **Two leaderboards (phase 4):** a **Weekly** shared-seed gauntlet (everyone faces the identical
+  opponents + home/away — most viral, friends compare the exact run) and an **All-time best streak.**
+  Both **server-verified** by re-simming the run (extend the resolve.js / Pages Functions / D1
+  anti-cheat already built for Daily).
+- **Build order:** (1) core local loop, (2) split-court + animated score, (3) calibration pass feeds
+  (1)'s numbers, (4) the two leaderboards.
+- **Also this session:** placed players are now **locked** — the send-away × on the court was removed
+  entirely (dead `removePick`/`restoreOfferFrom`/`poolForPlaced` chain deleted). "Play again" moved
+  above the copy buttons so it's visible without scrolling.
