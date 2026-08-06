@@ -1549,11 +1549,13 @@ function renderDynasty(card) {
             `<div class="result-cats">${catBarsHTML(res)}</div>` +
             `<div class="rc-gate">${GATE_PHRASE[res.gateCategory] || ""}</div>` +
           `</div>` +
+          (d.streak > 0 ? `<button id="dyn-share-card" class="ghost-btn dl-lb-btn">📋 Copy run card</button>` : "") +
           again +
         `</div>`;
     }
     el("dyn-view-toggle").addEventListener("click", () => { d.overView = onBoard ? "summary" : "board"; render(); });
     el("dyn-again").addEventListener("click", () => { if (d.sub === "weekly") state.dynSub = null; reset(); });
+    const sc = el("dyn-share-card"); if (sc) sc.addEventListener("click", () => copyDynastyShareCard(sc));
     return;
   }
 
@@ -1821,18 +1823,78 @@ function buildShareCanvas(d) {
   return cv;
 }
 
+// A Dynasty run's shareable card: the streak, your final five, the home floor, and how it ended.
+function dynastyShareCardData() {
+  const d = state.dynasty;
+  const five = state.slots.map((s, i) => {
+    const st = clubStyle(s._src.teamCode);
+    return {
+      x: SLOTS[i].x, y: SLOTS[i].y, slotLabel: SLOTS[i].label,
+      primary: st.primary, secondary: st.secondary, ink: textOn(st.primary),
+      mono: monogram(s.playerName), name: surname(s.playerName), abbr: st.abbr, season: s._src.seasonLabel,
+    };
+  });
+  return {
+    streak: d.streak,
+    subLabel: d.sub === "weekly" ? `Weekly Challenge · ${d.board}` : "Endless Run",
+    five,
+    arena: d.arena ? d.arena.name : null,
+    homeColor: d.arena ? d.arena.primary : null, homeAbbr: d.arena ? d.arena.abbr : null,
+    fellTo: d.opp ? `${prettyName(d.opp.teamName)} ${d.opp.seasonLabel}` : null,
+    fellScore: d.lastGame ? `${d.lastGame.theirs}–${d.lastGame.mine}` : null,
+  };
+}
+
+function buildDynastyShareCanvas(d) {
+  const W = 1080, H = 1350, cx = W / 2;
+  const BG = "#0e1420", LINE = "#39465c", INK = "#e7ecf3", MUTE = "#93a1b6", ACC = "#ff7d1a", GOLD = "#e6c65a";
+  const F = (wt, sz) => `${wt} ${sz}px "Inter", system-ui, -apple-system, "Segoe UI", sans-serif`;
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, "#141d2e"); grad.addColorStop(0.5, BG); grad.addColorStop(1, "#0b111b");
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = LINE; ctx.lineWidth = 2; rr(ctx, 18, 18, W - 36, H - 36, 22); ctx.stroke();
+  ctx.textAlign = "center";
+
+  ctx.fillStyle = INK; ctx.font = F(800, 46); ctx.fillText("👑 KING OF EUROPE", cx, 96);
+  ctx.fillStyle = ACC; ctx.font = F(800, 24); ctx.fillText("DYNASTY", cx, 134);
+
+  ctx.fillStyle = d.streak >= 10 ? GOLD : ACC; ctx.font = F(800, 150); ctx.fillText(`🔥 ${d.streak}`, cx, 302);
+  ctx.fillStyle = MUTE; ctx.font = F(800, 30); ctx.fillText("WIN STREAK", cx, 352);
+  ctx.fillStyle = INK; ctx.font = F(700, 26); ctx.fillText(d.subLabel, cx, 394);
+
+  const cx0 = 150, cy0 = 436, cw = 780, ch = 660;
+  drawCourt(ctx, cx0, cy0, cw, ch, LINE, d.homeColor ? { color: d.homeColor, abbr: d.homeAbbr } : null);
+  for (const p of d.five) {
+    const px = cx0 + (p.x / 100) * cw, py = cy0 + (p.y / 100) * ch, R = 42;
+    ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI * 2); ctx.fillStyle = p.primary; ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = p.secondary; ctx.stroke();
+    ctx.fillStyle = MUTE; ctx.font = F(800, 17); ctx.fillText(p.slotLabel, px, py - R - 11);
+    ctx.fillStyle = p.ink; ctx.font = F(800, 27); ctx.textBaseline = "middle"; ctx.fillText(p.mono, px, py + 1); ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK; ctx.font = F(700, 24); ctx.fillText(p.name, px, py + R + 30);
+    ctx.fillStyle = MUTE; ctx.font = F(600, 18); ctx.fillText(`${p.abbr} ${p.season}`, px, py + R + 54);
+  }
+
+  let by = 1182;
+  if (d.fellTo) { ctx.fillStyle = MUTE; ctx.font = F(700, 25); ctx.fillText(`Fell to ${d.fellTo}${d.fellScore ? "   " + d.fellScore : ""}`, cx, by); by += 44; }
+  if (d.arena) { ctx.fillStyle = MUTE; ctx.font = F(600, 22); ctx.fillText(`🏟  ${d.arena}`, cx, by); }
+  ctx.fillStyle = ACC; ctx.font = F(700, 27); ctx.fillText("king-of-europe.pages.dev", cx, 1306);
+  return cv;
+}
+
 // Build the card and COPY it to the clipboard (so it pastes straight into a chat) — the primary
 // action. Falls back to the native share sheet, then a download, if image-clipboard isn't supported.
 // A guard prevents a double-tap (or a re-render re-attaching the handler) from firing it twice.
 let sharingCard = false;
-function copyShareCard(btn) {
+function copyCard(btn, build) {
   if (sharingCard) return;
   sharingCard = true;
   const label = btn ? btn.textContent : "";
   const reset = () => { sharingCard = false; if (btn) btn.textContent = label; };
   const flash = (msg) => { if (btn) { btn.textContent = msg; setTimeout(reset, 1800); } else sharingCard = false; };
   let cv;
-  try { cv = buildShareCanvas(shareCardData()); }
+  try { cv = build(); }
   catch (e) { flash("Couldn't build"); return; }
   cv.toBlob((blob) => {
     if (!blob) { flash("Couldn't build"); return; }
@@ -1845,6 +1907,8 @@ function copyShareCard(btn) {
     shareOrDownloadCard(blob, flash, reset);
   }, "image/png");
 }
+const copyShareCard = (btn) => copyCard(btn, () => buildShareCanvas(shareCardData()));
+const copyDynastyShareCard = (btn) => copyCard(btn, () => buildDynastyShareCanvas(dynastyShareCardData()));
 function shareOrDownloadCard(blob, flash, reset) {
   const file = new File([blob], "king-of-europe.png", { type: "image/png" });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
