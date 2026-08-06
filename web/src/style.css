@@ -792,7 +792,9 @@ body[data-revealed="1"] #place-hint, body[data-picking="1"] #place-hint { displa
 .dyn-pick:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* run over */
-.dyn-over { text-align: center; padding: 1.2rem 0.5rem; }
+.dyn-over { position: relative; text-align: center; padding: 2.6rem 0.5rem 1.2rem; }
+.dyn-view-toggle { position: absolute; top: 0; right: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 0.35rem 0.85rem; font-size: 0.8rem; font-weight: 700; color: var(--ink); cursor: pointer; transition: border-color 0.12s, color 0.12s; }
+.dyn-view-toggle:hover { border-color: var(--accent); color: var(--accent); }
 .dyn-over-label { text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-size: 0.8rem; }
 .dyn-streak-big { font-size: 3.4rem; font-weight: 900; color: var(--accent); line-height: 1.1; }
 .dyn-streak-cap { text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-size: 0.8rem; margin-bottom: 0.9rem; }

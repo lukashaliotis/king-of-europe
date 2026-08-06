@@ -1379,25 +1379,31 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 // standings. No name yet → a small join form. Offline → the run still shows, board just says so.
 const dynBoardTitle = (board) => (board === "alltime" ? "👑 All-time streaks" : `🗓 This week · ${board}`);
 
-// The run-over leaderboard: post the finished run (once) to its board — all-time or this week's — then
-// show the standings. A weekly run also locks the week's ranked attempt.
-async function dynastyOverBoard() {
-  const box = el("dyn-lb"); if (!box) return;
+// Post the finished run to its board ONCE (the server re-simulates the streak), caching the result so
+// toggling between the summary and the leaderboard doesn't re-post.
+function ensureDynSubmit() {
   const d = state.dynasty;
-  if (d.sub === "weekly" && !d.savedWeekly) { saveWeekly(d.board, d.streak); d.savedWeekly = true; }
+  if (!d || d.submitted || d.submitting || d.streak === 0) return;
+  const id = getIdentity();
+  if (!id || !id.name) return;            // needs a name — the leaderboard view prompts for one
+  d.submitting = true;
+  postDynastyRun(d.board)
+    .then((data) => { d.boardData = data; d.submitted = true; })
+    .catch(() => { d.boardErr = true; })
+    .finally(() => { d.submitting = false; if (state.dynasty === d && d.phase === "over" && d.overView === "board") render(); });
+}
+
+// The leaderboard VIEW of the over screen (shown when the toggle is on "board").
+function renderDynBoardView(box) {
+  const d = state.dynasty;
   const title = dynBoardTitle(d.board);
-  // A 0-win run doesn't make the board — no point posting or offering to join.
-  if (d.streak === 0) { box.innerHTML = `<div class="dyn-lb-status">Win at least one game to make the leaderboard.</div>`; return; }
+  if (d.streak === 0) { loadDynBoard(box, d.board); return; }   // read-only standings; nothing to post
   const id = getIdentity();
   if (!id || !id.name) { renderDynNameEntry(box, title); return; }
+  if (d.boardData) { renderDynBoard(box, d.boardData, title); return; }
+  if (d.boardErr) { box.innerHTML = `<div class="dyn-lb-status off">Leaderboard offline — your streak: 🔥 ${d.streak}</div>`; return; }
   box.innerHTML = `<div class="dyn-lb-status">Posting your run…</div>`;
-  try {
-    const data = d.submitted ? await fetchDynastyBoard(d.board, id.uid) : await postDynastyRun(d.board);
-    d.submitted = true;
-    renderDynBoard(box, data, title);
-  } catch (e) {
-    box.innerHTML = `<div class="dyn-lb-status off">Leaderboard offline — your streak: 🔥 ${d.streak}</div>`;
-  }
+  ensureDynSubmit();
 }
 
 function renderDynNameEntry(box, title) {
@@ -1407,7 +1413,7 @@ function renderDynNameEntry(box, title) {
       `<button id="dyn-join" class="mini-btn">Join</button></div>`;
   const input = el("dyn-name"), join = el("dyn-join");
   if (input) input.focus();
-  const go = () => { const n = input.value.trim(); if (!n) return; saveName(n); dynastyOverBoard(); };
+  const go = () => { const n = input.value.trim(); if (!n) return; saveName(n); render(); };
   if (join) join.addEventListener("click", go);
   if (input) input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
 }
@@ -1510,23 +1516,33 @@ function renderDynasty(card) {
 
   // ---- the run ended: streak + the same weakest-link readout Classic gives ----
   if (d.phase === "over") {
-    const lg = d.lastGame;
-    const res = projectRecord(state.slots, state.data.seasons, undefined, 1, null, null);
-    card.innerHTML =
-      `<div class="dyn-over">` +
-        `<div class="dyn-over-label">Run over</div>` +
-        `<div class="dyn-streak-big">🔥 ${d.streak}</div>` +
-        `<div class="dyn-streak-cap">win streak</div>` +
-        `<div class="dyn-scoreline loss">Lost ${lg.theirs}–${lg.mine} · fell to ${oppName}</div>` +
-        `<div class="result-cats-wrap"><div class="rc-head">Where your dynasty ended up</div>` +
-          `<div class="result-cats">${catBarsHTML(res)}</div>` +
-          `<div class="rc-gate">${GATE_PHRASE[res.gateCategory] || ""}</div>` +
-        `</div>` +
-        `<div class="dyn-lb" id="dyn-lb"></div>` +
-        `<button id="dyn-again" class="play-btn">${d.sub === "weekly" ? "← Dynasty lobby" : "↻ New dynasty"}</button>` +
-      `</div>`;
+    if (!d.overView) d.overView = "summary";
+    if (d.sub === "weekly" && !d.savedWeekly) { saveWeekly(d.board, d.streak); d.savedWeekly = true; } // lock the week's attempt
+    ensureDynSubmit(); // record the run even if they never open the leaderboard
+    const onBoard = d.overView === "board";
+    const toggle = `<button id="dyn-view-toggle" class="dyn-view-toggle">${onBoard ? "← My run" : "🏆 Leaderboard"}</button>`;
+    const again = `<button id="dyn-again" class="play-btn">${d.sub === "weekly" ? "← Dynasty lobby" : "↻ New dynasty"}</button>`;
+    if (onBoard) {
+      card.innerHTML = `<div class="dyn-over">${toggle}<div class="dyn-lb" id="dyn-lb"></div>${again}</div>`;
+      renderDynBoardView(el("dyn-lb"));
+    } else {
+      const lg = d.lastGame;
+      const res = projectRecord(state.slots, state.data.seasons, undefined, 1, null, null);
+      card.innerHTML =
+        `<div class="dyn-over">${toggle}` +
+          `<div class="dyn-over-label">Run over</div>` +
+          `<div class="dyn-streak-big">🔥 ${d.streak}</div>` +
+          `<div class="dyn-streak-cap">win streak</div>` +
+          `<div class="dyn-scoreline loss">Lost ${lg.theirs}–${lg.mine} · fell to ${oppName}</div>` +
+          `<div class="result-cats-wrap"><div class="rc-head">Where your dynasty ended up</div>` +
+            `<div class="result-cats">${catBarsHTML(res)}</div>` +
+            `<div class="rc-gate">${GATE_PHRASE[res.gateCategory] || ""}</div>` +
+          `</div>` +
+          again +
+        `</div>`;
+    }
+    el("dyn-view-toggle").addEventListener("click", () => { d.overView = onBoard ? "summary" : "board"; render(); });
     el("dyn-again").addEventListener("click", () => { if (d.sub === "weekly") state.dynSub = null; reset(); });
-    dynastyOverBoard();
     return;
   }
 
