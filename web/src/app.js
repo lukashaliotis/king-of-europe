@@ -44,7 +44,7 @@ const SORTS = [
   ["mpg", "MIN"], ["pts", "PTS"], ["reb", "REB"], ["ast", "AST"],
   ["stl", "STL"], ["blk", "BLK"], ["ts", "TS%"],
 ];
-const POS_ORDER = { G: 0, F: 1, C: 2 }; // draft sequence runs guards → forwards → centres last
+const POS_ORDER = { G: 0, F: 1, C: 2 }; // Dynasty recruit list order: guards → forwards → centre
 
 const state = {
   data: null, pools: [], slots: [null, null, null, null, null], offer: null, pending: null,
@@ -895,8 +895,7 @@ function sortedPool(pool) {
   if (state.posFilter !== "ALL") list = list.filter((p) => p.pos === state.posFilter);
   const key = state.sortBy;
   const val = (p) => (key === "mpg" ? (p.mpg ?? 0) : (p.box[key] ?? 0));
-  // Primary sequence is by position (guards, forwards, centres last); the chosen stat orders within.
-  list.sort((a, b) => (POS_ORDER[a.pos] - POS_ORDER[b.pos]) || (val(b) - val(a)));
+  list.sort((a, b) => val(b) - val(a)); // purely the chosen stat (minutes by default)
   return list;
 }
 
@@ -1549,7 +1548,9 @@ function renderDynasty(card) {
   // ---- recruit STEP 1: pick one of their players (with full stats) ----
   if (d.phase === "recruit" && d.recruitStep === "in") {
     const lg = d.lastGame;
-    const rows = opp.five.map((p) => {
+    // the vanquished five, listed by position — guards, then forwards, then the centre
+    const inOrder = [...opp.five].sort((a, b) => (POS_ORDER[a.pos] - POS_ORDER[b.pos]) || ((b.mpg ?? 0) - (a.mpg ?? 0)));
+    const rows = inOrder.map((p) => {
       const owned = d.squad.some((s) => s.playerCode === p.playerCode);
       return dynStatRow(p, opp.teamCode, { as: "button", cls: owned ? "owned" : "", attrs: `data-in="${p.playerCode}" ${owned ? "disabled title='Already yours'" : ""}` });
     }).join("");
