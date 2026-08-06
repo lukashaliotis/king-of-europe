@@ -11,8 +11,12 @@ import { hashSeed } from "./daily.js";
 export const DYN = {
   F0: 3,          // round-1 draw floor: weak-ish opponents early so the first games are winnable
   slope: 1.0,     // how fast the draw floor rises (you face better real clubs each round)
-  esc: 1.1,       // per-round escalation ADDED to the opponent's effective strength — the handicap
-                  // that guarantees even a looted superteam eventually falls (real rosters cap ~S22)
+  esc: 0.55,      // per-round escalation ADDED to the opponent's effective strength — the handicap
+                  // that guarantees even a looted superteam eventually falls (real rosters cap ~S22).
+                  // RECALIBRATED for 5v5 in sim/dynasty_recalib.mjs (the first pass, esc=1.1, was tuned
+                  // for a 6-man squad and ran too hard at 5v5). At 0.55: EXPERT median 2, p90 12, p95 15,
+                  // max ~28; CASUAL p90 3 — restores the great-run target while staying brutal at the
+                  // median (most runs die by round 2). Re-tune HERE.
   drawAttempts: 250,
   homeEdge: 0.045, // fallback ±4.5% when a club has no rated arena (neutral)
 };

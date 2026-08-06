@@ -389,7 +389,14 @@ streak," not "34-4." Locked design (user, this session):
     Verified live end-to-end (all-time + weekly submissions re-sim to the same streak; tampering
     rejected). **Draft-shopping caveat:** weekly server keeps BEST-per-week (client enforces one
     attempt); a determined refresh-mid-run could retry — acceptable for a friends' game, tighten later
-    if needed. **Difficulty still to recalibrate for 5v5** (esc=1.1 was tuned for a 6-man squad).
+    if needed.
+  - **5v5 RECALIBRATION DONE (2026-08-06):** `sim/dynasty_recalib.mjs` re-runs the sweep against the
+    SHIPPED dynasty.js functions with the real 5v5 mechanic (expert = greedy draft + optimal forced
+    recruit; casual = chase scoring). Confirmed the old `esc=1.1` ran too hard at 5v5 (expert p90 8,
+    p95 10). **Locked `DYN.esc = 0.55`** → expert median 2, p90 12, p95 15, max ~28; casual p90 3 —
+    restores the great-run target (p90 12 / p95 15) while the median stays a brutal 2 (single-game
+    variance kills most runs early regardless of esc, which is what keeps it hard). Note: pre-existing
+    all-time entries were earned under the harder esc=1.1.
 - **Build order:** (1) core local loop, (2) split-court + animated score, (3) calibration pass feeds
   (1)'s numbers, (4) the two leaderboards.
 - **Split court DONE (2026-08-05c):** the matchup + game now render a full vertical court in the main
