@@ -897,3 +897,18 @@ button.dyn-prow:disabled { opacity: 0.4; cursor: not-allowed; }
 .dyn-lobby-card .play-btn { align-self: flex-start; margin: 0; }
 .dlc-done { font-size: 0.9rem; color: var(--good); font-weight: 600; }
 @media (max-width: 560px) { .dyn-lobby { grid-template-columns: 1fr; } }
+
+/* leaderboard hub (modal with Weekly / All-time / Daily tabs) */
+.hub-btn { font-size: 0.95rem; }
+.lb-hub { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; }
+.lb-hub.hidden { display: none; }
+.hub-backdrop { position: absolute; inset: 0; background: rgba(6,10,18,0.66); }
+.hub-card { position: relative; width: min(440px, 92vw); max-height: 86vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.4rem 1.2rem; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.hub-close { position: absolute; top: 0.6rem; right: 0.8rem; background: none; border: none; color: var(--muted); font-size: 1.1rem; cursor: pointer; line-height: 1; }
+.hub-close:hover { color: var(--ink); }
+.hub-title { text-align: center; margin: 0 0 1rem; font-size: 1.2rem; }
+.hub-tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
+.hub-tab { flex: 1; background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 0.42rem 0.3rem; font-size: 0.82rem; font-weight: 700; color: var(--muted); cursor: pointer; transition: border-color 0.12s, color 0.12s; }
+.hub-tab:hover { color: var(--ink); }
+.hub-tab.on { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: var(--accent); color: var(--accent); }
+.hub-body { min-height: 130px; }

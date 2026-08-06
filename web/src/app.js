@@ -132,6 +132,8 @@ async function init() {
   el("reset-btn").addEventListener("click", reset);
   document.querySelectorAll(".mode-tab").forEach((b) =>
     b.addEventListener("click", () => setMode(b.dataset.mode)));
+  el("lb-hub-btn").addEventListener("click", openHub);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !el("lb-hub").classList.contains("hidden")) closeHub(); });
   document.body.dataset.mode = state.mode;
   initOnboarding();
   render();
@@ -1444,7 +1446,7 @@ function renderDynBoard(box, data, title) {
     `<li class="${data.you && r.rank === data.you.rank ? "me" : ""}"><span class="lb-rank">${r.rank}</span>` +
     `<span class="lb-name">${esc(r.name)}</span><span class="lb-streak">🔥 ${r.streak}</span></li>`).join("");
   box.innerHTML =
-    `<div class="dyn-lb-head">${title || "👑 All-time streaks"}</div>` +
+    (title == null ? `<div class="dyn-lb-head">👑 All-time streaks</div>` : title ? `<div class="dyn-lb-head">${title}</div>` : "") +
     (rows ? `<ol class="dyn-lb-list">${rows}</ol>` : `<div class="dyn-lb-status">Be the first to post a streak.</div>`) +
     (data.you ? `<div class="dyn-lb-you">You're <b>#${data.you.rank}</b> of ${data.total} · best <b>🔥 ${data.you.streak}</b></div>` : "");
 }
@@ -1455,6 +1457,57 @@ async function loadDynBoard(container, board) {
   container.innerHTML = `<div class="dyn-lb-status">Loading…</div>`;
   try { renderDynBoard(container, await fetchDynastyBoard(board, id && id.uid), dynBoardTitle(board)); }
   catch (e) { container.innerHTML = `<div class="dyn-lb-status off">Leaderboard offline.</div>`; }
+}
+
+/* ---------------- leaderboard hub (Daily · Dynasty Weekly · Dynasty All-time) ---------------- */
+
+const HUB_TABS = [
+  { id: "weekly", label: "🗓 Weekly", kind: "dynasty", board: () => weekKey() },
+  { id: "alltime", label: "👑 All-time", kind: "dynasty", board: () => "alltime" },
+  { id: "daily", label: "📅 Daily", kind: "daily" },
+];
+let hubTab = "weekly";
+
+function openHub() { el("lb-hub").classList.remove("hidden"); renderHub(); }
+function closeHub() { el("lb-hub").classList.add("hidden"); }
+
+function renderHub() {
+  const box = el("lb-hub");
+  const tabs = HUB_TABS.map((t) => `<button class="hub-tab${t.id === hubTab ? " on" : ""}" data-tab="${t.id}">${t.label}</button>`).join("");
+  box.innerHTML =
+    `<div class="hub-backdrop" data-close="1"></div>` +
+    `<div class="hub-card" role="dialog" aria-modal="true" aria-label="Leaderboards">` +
+      `<button class="hub-close" data-close="1" aria-label="Close">✕</button>` +
+      `<h2 class="hub-title">🏆 Leaderboards</h2>` +
+      `<div class="hub-tabs">${tabs}</div>` +
+      `<div class="hub-body" id="hub-body"><div class="dyn-lb-status">Loading…</div></div>` +
+    `</div>`;
+  box.querySelectorAll("[data-close]").forEach((e) => (e.onclick = closeHub));
+  box.querySelectorAll(".hub-tab").forEach((b) => (b.onclick = () => { hubTab = b.dataset.tab; renderHub(); }));
+  loadHubBoard();
+}
+
+async function loadHubBoard() {
+  const body = el("hub-body"); if (!body) return;
+  const t = HUB_TABS.find((x) => x.id === hubTab);
+  const id = getIdentity();
+  try {
+    if (t.kind === "daily") {
+      renderDailyHubBoard(body, await fetchLeaderboard(utcDayKey(), id && id.uid));
+    } else {
+      renderDynBoard(body, await fetchDynastyBoard(t.board(), id && id.uid), ""); // tab is the header
+    }
+  } catch (e) { body.innerHTML = `<div class="dyn-lb-status off">Leaderboard offline.</div>`; }
+}
+
+// Daily uses a record (W–L) + stage, not a streak, so it renders with its own columns.
+function renderDailyHubBoard(box, data) {
+  const rows = (data.top || []).map((r) =>
+    `<li class="${data.you && r.rank === data.you.rank ? "me" : ""}"><span class="lb-rank">${r.rank}</span>` +
+    `<span class="lb-name">${esc(r.name)}</span><span class="lb-streak">${r.wins}–${r.losses}</span></li>`).join("");
+  box.innerHTML =
+    (rows ? `<ol class="dyn-lb-list">${rows}</ol>` : `<div class="dyn-lb-status">No entries yet today.</div>`) +
+    (data.you ? `<div class="dyn-lb-you">You're <b>#${data.you.rank}</b> of ${data.total} · <b>${data.you.wins}–${data.you.losses}</b></div>` : "");
 }
 
 // The Dynasty lobby: choose the Weekly shared challenge or an Endless run, with this week's standings.
