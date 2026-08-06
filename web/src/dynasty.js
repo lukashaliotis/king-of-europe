@@ -95,27 +95,41 @@ export function winProbability(myS, opp, home, homeMult) {
   return Math.max(0.02, Math.min(0.98, gameProbability(myS, opp.effS) * mult));
 }
 
-// Split a team's total into 4 quarter buckets (exact sum) so the score can be revealed quarter by
-// quarter like a live game — with lead changes, not a monotone climb.
-function splitQuarters(total, rng) {
+// The COMBINED points scored each quarter (pace), exact sum = total, with real variance.
+function splitPace(total, rng) {
   const base = total / 4, q = [];
   let acc = 0;
-  for (let i = 0; i < 3; i++) { const v = Math.max(9, Math.round(base + (rng() - 0.5) * 9)); q.push(v); acc += v; }
-  q.push(Math.max(7, total - acc));
+  for (let i = 0; i < 3; i++) { const v = Math.max(24, Math.round(base + (rng() - 0.5) * 12)); q.push(v); acc += v; }
+  q.push(Math.max(22, total - acc));
   return q;
 }
 
-// A plausible EuroLeague final score for flavour, consistent with who won and how one-sided it was,
-// plus per-quarter splits for the simulated reveal.
+// A plausible EuroLeague final score, revealed quarter by quarter. The per-quarter MARGINS carry a
+// big swing, so the lead changes hands — early quarters can go the other way even in a win, and the
+// final margin only emerges late. A bigger strength edge → a bigger, steadier lead; a coin-flip game
+// stays genuinely tense throughout (frequent lead changes).
 function scoreline(win, p, rng) {
-  const total = 150 + Math.floor(rng() * 26);            // 150–175 combined
-  let margin = 1 + Math.round(Math.abs(p - 0.5) * 34 + rng() * 9); // bigger edge → bigger margin
-  const signed = win ? margin : -margin;
-  let mine = Math.round((total + signed) / 2);
-  let theirs = total - mine;
-  if (win && mine <= theirs) { mine = theirs + 1 + Math.floor(rng() * 3); theirs = total - mine; }
-  if (!win && theirs <= mine) { theirs = mine + 1 + Math.floor(rng() * 3); mine = total - theirs; }
-  return { mine, theirs, quarters: { mine: splitQuarters(mine, rng), theirs: splitQuarters(theirs, rng) } };
+  const total = 150 + Math.floor(rng() * 26);                     // 150–175 combined
+  const mag = 1 + Math.round(Math.abs(p - 0.5) * 30 + rng() * 8); // final margin magnitude
+  const finalMargin = win ? mag : -mag;
+  const pace = splitPace(total, rng);
+  // 4 quarter margins that sum to finalMargin, each with a wide swing so the running lead wobbles.
+  const SWING = 9;
+  const raw = [];
+  for (let i = 0; i < 4; i++) raw.push(finalMargin / 4 + (rng() - 0.5) * 2 * SWING);
+  const corr = (finalMargin - raw.reduce((a, b) => a + b, 0)) / 4;
+  const qm = raw.map((x) => x + corr);
+  const mine = [], theirs = [];
+  for (let i = 0; i < 4; i++) {
+    let m = Math.round((pace[i] + qm[i]) / 2);
+    m = Math.max(8, Math.min(pace[i] - 8, m));                    // both teams always score
+    mine.push(m); theirs.push(pace[i] - m);
+  }
+  let mineTot = mine.reduce((a, b) => a + b, 0), theirsTot = theirs.reduce((a, b) => a + b, 0);
+  // the scoreboard must agree with who actually won — nudge Q4 if rounding flipped it
+  if (win && mineTot <= theirsTot) { const d = theirsTot - mineTot + 1; mine[3] += d; theirs[3] -= d; }
+  if (!win && theirsTot <= mineTot) { const d = mineTot - theirsTot + 1; theirs[3] += d; mine[3] -= d; }
+  return { mine: mine.reduce((a, b) => a + b, 0), theirs: theirs.reduce((a, b) => a + b, 0), quarters: { mine, theirs } };
 }
 
 export function resolveGame(myS, opp, home, homeMult, rng) {

@@ -87,7 +87,10 @@ let dynTimer = null; // Dynasty animations (opponent/home-away spin, simulated s
 
 function prettyName(name) {
   return name.split(",")
-    .map((p) => p.trim().toLowerCase().replace(/\b([a-zà-ÿ])/g, (m) => m.toUpperCase()))
+    .map((p) => p.trim().toLowerCase()
+      .replace(/\b([a-zà-ÿ])/g, (m) => m.toUpperCase())
+      // generational suffixes are Roman numerals, not names — keep them upper-case (Brown III, not Iii)
+      .replace(/\b(ii|iii|iv|vi|vii|viii|ix)\b/gi, (m) => m.toUpperCase()))
     .join(", ");
 }
 const surname = (name) => prettyName(name).split(",")[0];
@@ -586,7 +589,16 @@ function animateScore() {
     const m = el("dyn-score-mine"), t = el("dyn-score-theirs"), q = el("dyn-score-q");
     if (m) m.textContent = d.play.mine; if (t) t.textContent = d.play.theirs;
     if (q) q.textContent = d.play.done ? "FINAL" : "Q" + d.play.q;
-    if (d.play.done) { const b = el("dyn-scoreboard"); if (b) b.classList.add(lg.win ? "won" : "lost"); const m2 = el("dyn-score-mine"), t2 = el("dyn-score-theirs"); if (lg.win && m2) m2.classList.add("lead"); if (!lg.win && t2) t2.classList.add("lead"); }
+    // while the game runs, highlight whoever's currently ahead so lead changes read on the scoreboard
+    if (m && t) {
+      m.classList.toggle("ahead", !d.play.done && d.play.mine > d.play.theirs);
+      t.classList.toggle("ahead", !d.play.done && d.play.theirs > d.play.mine);
+    }
+    if (d.play.done) {
+      const b = el("dyn-scoreboard"); if (b) b.classList.add(lg.win ? "won" : "lost");
+      if (m) { m.classList.remove("ahead"); if (lg.win) m.classList.add("lead"); }
+      if (t) { t.classList.remove("ahead"); if (!lg.win) t.classList.add("lead"); }
+    }
   };
   let q = 0;
   const step = () => {
