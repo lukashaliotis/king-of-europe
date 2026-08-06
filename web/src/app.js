@@ -39,10 +39,12 @@ const GATE_PHRASE = {
   defense: "Not enough defense.",
   efficiency: "Not efficient enough.",
 };
+// "Best" (overall strength) is hidden for now — reserved for a possible easy mode. Default is minutes.
 const SORTS = [
-  ["strength", "Best"], ["pts", "PTS"], ["reb", "REB"], ["ast", "AST"],
+  ["mpg", "MIN"], ["pts", "PTS"], ["reb", "REB"], ["ast", "AST"],
   ["stl", "STL"], ["blk", "BLK"], ["ts", "TS%"],
 ];
+const POS_ORDER = { G: 0, F: 1, C: 2 }; // draft sequence runs guards → forwards → centres last
 
 const state = {
   data: null, pools: [], slots: [null, null, null, null, null], offer: null, pending: null,
@@ -54,7 +56,7 @@ const state = {
   coachName: null,   // chosen coach (must have coached one of your five)
   sixth: null,       // the 6th man (bench, positionless, usage-discounted)
   revealed: false,   // the record stays hidden until arena spun + coach committed
-  sortBy: "strength", posFilter: "ALL",
+  sortBy: "mpg", posFilter: "ALL",
   spinning: false,
   justSpun: false,   // triggers the roster cascade for one render
   courtRevealed: false, // arena outcome shows first; the court transforms a beat later
@@ -863,11 +865,12 @@ function renderCourt() {
 }
 
 function sortedPool(pool) {
-  let list = pool.players;
+  let list = [...pool.players];
   if (state.posFilter !== "ALL") list = list.filter((p) => p.pos === state.posFilter);
-  if (state.sortBy !== "strength") {
-    list = [...list].sort((a, b) => (b.box[state.sortBy] ?? 0) - (a.box[state.sortBy] ?? 0));
-  }
+  const key = state.sortBy;
+  const val = (p) => (key === "mpg" ? (p.mpg ?? 0) : (p.box[key] ?? 0));
+  // Primary sequence is by position (guards, forwards, centres last); the chosen stat orders within.
+  list.sort((a, b) => (POS_ORDER[a.pos] - POS_ORDER[b.pos]) || (val(b) - val(a)));
   return list;
 }
 
@@ -1330,12 +1333,13 @@ function dynastyCourtHTML(d, tinted) {
   const opp = d.opp;
   const homeCode = d.home ? (d.arena && d.arena.teamCode) : opp.teamCode;
   const tint = homeCode ? clubStyle(homeCode) : null;
-  const oppDiscs = opp.five.map((p, i) => dynDisc(p, opp.teamCode, DYN_OPP[i])).join("");
+  // Order BOTH fives to the court slots [G,G,F,F,C] so the centre sits under the rim and the guards
+  // out on the perimeter (opp.five arrives in greedy-pick order, not position order).
+  const oppDiscs = orderFive(opp.five).map((p, i) => dynDisc(p, opp.teamCode, DYN_OPP[i])).join("");
   const youDiscs = state.slots.map((p, i) => dynDisc(p, p._src.teamCode, DYN_YOU[i])).join("");
   return `<div class="dyn-court${tinted ? " tinted" : ""}"${tint ? ` style="--tint:${tint.primary}"` : ""}>` +
     DYN_COURT_SVG +
     `<div class="dyn-court-tint"></div><div class="dyn-court-mark">${tint ? tint.abbr : ""}</div>` +
-    `<div class="dyn-half-tag you">Your five</div>` +
     oppDiscs + youDiscs +
   `</div>`;
 }
@@ -1347,6 +1351,8 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 async function dynastyOverBoard() {
   const box = el("dyn-lb"); if (!box) return;
   const d = state.dynasty;
+  // A 0-win run doesn't make the board — no point posting or offering to join.
+  if (d.streak === 0) { box.innerHTML = `<div class="dyn-lb-status">Win at least one game to make the leaderboard.</div>`; return; }
   const id = getIdentity();
   if (!id || !id.name) { renderDynNameEntry(box); return; }
   box.innerHTML = `<div class="dyn-lb-status">Posting your run…</div>`;
@@ -1414,7 +1420,7 @@ function renderDynasty(card) {
       dynHeader(d, `Round ${d.round}`) +
       `<div class="dyn-loc-spin"><span class="dyn-loc-cap">Home or away —</span> ` +
         `<span class="dyn-loc-reel" id="dyn-loc-reel">· · ·</span></div>` +
-      `<div class="dyn-abovecourt">${prettyName(opp.teamName)} <span class="muted">${opp.seasonLabel}</span></div>` +
+      `<div class="dyn-abovecourt">${badge(opp.teamCode)} ${prettyName(opp.teamName)} <span class="muted">${opp.seasonLabel}</span></div>` +
       dynastyCourtHTML(d, false);
     return;
   }
@@ -1500,7 +1506,7 @@ function renderDynasty(card) {
   card.innerHTML =
     dynHeader(d, `Round ${d.round}`) +
     `<div class="dyn-loc ${d.home ? "home" : "away"}">${d.home ? "🏠 Home — " + (d.arena ? d.arena.name : "your floor") : "✈️ Away — " + opp.arenaName}</div>` +
-    `<div class="dyn-abovecourt">${prettyName(opp.teamName)} <span class="muted">${opp.seasonLabel}</span></div>` +
+    `<div class="dyn-abovecourt">${badge(opp.teamCode)} ${prettyName(opp.teamName)} <span class="muted">${opp.seasonLabel}</span></div>` +
     dynastyCourtHTML(d, true) +
     `<div class="dyn-play-wrap"><button id="dyn-play" class="play-btn">▶ Play the game</button></div>`;
   el("dyn-play").addEventListener("click", playGauntletGame);
