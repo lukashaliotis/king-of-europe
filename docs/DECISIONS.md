@@ -377,6 +377,19 @@ streak," not "34-4." Locked design (user, this session):
   opponents + home/away — most viral, friends compare the exact run) and an **All-time best streak.**
   Both **server-verified** by re-simming the run (extend the resolve.js / Pages Functions / D1
   anti-cheat already built for Daily).
+  - **DONE & LIVE (2026-08-06):** deterministic gauntlet (`roundRng(seed,round,salt)` → seeded
+    opponent/home-away/game; `replayDynastyRun` + `resolveDynasty.js` re-sim for the authoritative
+    streak). **Weekly = "Daily, but Dynasty"** (user chose fixed draft + gauntlet): `buildDynastyBoard`
+    is a fixed 5-draw week-seeded board (guaranteed to allow a legal 2G/2F/1C five); the gauntlet shares
+    the same `dynastyWeekSeed(weekKey)`. **Dynasty lobby** (Weekly vs Endless) with this week's
+    standings; weekly is one ranked run (local lockout), endless is a free draft → all-time board.
+    Server validates a weekly run uses the week's REAL seed + a five drafted from the week's board +
+    an arena that's one of the five's clubs (no seed-shopping / off-board fives). New `dynasty_scores`
+    D1 table (best per board+uid), `/api/dynasty-submit` + `/api/dynasty-board`, client submit/fetch.
+    Verified live end-to-end (all-time + weekly submissions re-sim to the same streak; tampering
+    rejected). **Draft-shopping caveat:** weekly server keeps BEST-per-week (client enforces one
+    attempt); a determined refresh-mid-run could retry — acceptable for a friends' game, tighten later
+    if needed. **Difficulty still to recalibrate for 5v5** (esc=1.1 was tuned for a 6-man squad).
 - **Build order:** (1) core local loop, (2) split-court + animated score, (3) calibration pass feeds
   (1)'s numbers, (4) the two leaderboards.
 - **Split court DONE (2026-08-05c):** the matchup + game now render a full vertical court in the main
