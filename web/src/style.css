@@ -93,6 +93,9 @@ body {
 .ob-nav .ob-back { min-width: 84px; }
 .ob-nav .ob-next { min-width: 84px; padding-left: 1.6rem; padding-right: 1.6rem; }
 .ob-nav .ob-back:disabled { opacity: 0.35; cursor: not-allowed; }
+.ob-nav.one { justify-content: center; }
+.ob-intro-link { display: block; margin: 0.8rem auto 0; background: none; border: none; color: var(--muted); font-size: 0.82rem; cursor: pointer; }
+.ob-intro-link:hover { color: var(--accent); }
 
 /* Logo — placeholder lockup: crown hanging off the K, basketball alongside.
    Header is a single aligned row: [? · logo] on the left, [modes · ☀] on the right. The extra

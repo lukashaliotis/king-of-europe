@@ -81,10 +81,54 @@ function render() {
   box.querySelector(".ob-backdrop").onclick = close;
 }
 
-// Wire the "?" help button (always reopens) and auto-open once for first-timers.
+// Per-mode "how to play" — the "?" is mode-aware, so it always explains the mode you're in.
+const MODE_HELP = {
+  classic: {
+    icon: "🏀", title: "Classic",
+    body: "Spin a EuroLeague <b>club + year</b> and draft <b>five starters</b> (2 guards, 2 forwards, 1 centre) plus a <b>6th man</b>. Spin a <b>home arena</b>, pick a <b>coach</b>, then play a <b>38-game season</b> and a <b>playoff bracket</b>. Your record is capped by your <b>weakest category</b> — balance beats stacking.",
+  },
+  daily: {
+    icon: "📅", title: "Daily",
+    body: "The <b>same six draws</b> for everyone today — <b>no re-spins</b>. Draft your best five (+6th), you get <b>one ranked attempt</b>, then compare on the <b>leaderboard</b>. A fresh board drops at midnight UTC.",
+  },
+  versus: {
+    icon: "⚔️", title: "Versus",
+    body: "Draft from a <b>shared board</b>, then <b>mint a code</b> and send it to a friend. They draft from the same board, and the sim plays a <b>best-of-seven</b> between your two fives.",
+  },
+  salary: {
+    icon: "💰", title: "Salary Cap",
+    body: "Like Classic, but every player has a <b>price</b> and you build under a <b>salary cap</b>. Squeeze a title contender out of the budget — stars cost, role players stretch it.",
+  },
+  dynasty: {
+    icon: "🔥", title: "Dynasty",
+    body: "Draft a <b>five</b>, then survive an <b>endless gauntlet</b>: beat a club and <b>loot one of their players</b> (swapping one of yours out), then face a tougher team. Your <b>win streak</b> is the score. <b>Weekly</b> is the identical challenge for everyone; <b>Endless</b> is a free draft chasing the all-time board.",
+  },
+};
+
+function openModeHelp(mode) {
+  const h = MODE_HELP[mode] || MODE_HELP.classic;
+  const box = document.getElementById("onboarding");
+  box.classList.remove("hidden");
+  box.innerHTML =
+    `<div class="ob-backdrop" data-close="1"></div>` +
+    `<div class="ob-card" role="dialog" aria-modal="true" aria-label="How to play">` +
+      `<button class="ob-skip" data-act="skip" type="button">✕</button>` +
+      `<div class="ob-icon">${h.icon}</div>` +
+      `<h2 class="ob-title">How to play — ${h.title}</h2>` +
+      `<p class="ob-body">${h.body}</p>` +
+      `<div class="ob-nav one"><button class="spin-btn" data-act="next" type="button">Got it</button></div>` +
+      `<button class="ob-intro-link" data-act="intro" type="button">Full intro →</button>` +
+    `</div>`;
+  box.querySelector('[data-act="skip"]').onclick = close;
+  box.querySelector('[data-act="next"]').onclick = close;
+  box.querySelector('[data-act="intro"]').onclick = () => open(0); // the full first-run carousel
+  box.querySelector(".ob-backdrop").onclick = close;
+}
+
+// Wire the "?" help button (mode-aware) and auto-open the full intro once for first-timers.
 export function initOnboarding() {
   const help = document.getElementById("help-btn");
-  if (help) help.addEventListener("click", () => open(0));
+  if (help) help.addEventListener("click", () => openModeHelp(document.body.dataset.mode || "classic"));
 
   document.addEventListener("keydown", (e) => {
     const box = document.getElementById("onboarding");
