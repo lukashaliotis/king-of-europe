@@ -883,3 +883,14 @@ button.dyn-prow:disabled { opacity: 0.4; cursor: not-allowed; }
 .dyn-lb-join { display: flex; gap: 0.5rem; justify-content: center; }
 .dyn-name-input { flex: 0 1 220px; background: var(--field); border: 1px solid var(--line); border-radius: 999px; padding: 0.45rem 0.9rem; color: var(--ink); font: inherit; }
 .dyn-name-input:focus { outline: none; border-color: var(--accent); }
+
+/* Dynasty lobby: Weekly vs Endless */
+.dyn-lobby { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+.dyn-lobby-card { display: flex; flex-direction: column; background: var(--panel-2); border: 1.5px solid var(--line); border-radius: var(--radius); padding: 1rem; }
+.dyn-lobby-card.weekly { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.dlc-tag { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 800; color: var(--accent); margin-bottom: 0.4rem; }
+.dyn-lobby-card h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+.dyn-lobby-card p { margin: 0 0 0.9rem; font-size: 0.85rem; color: var(--muted); line-height: 1.45; flex: 1; }
+.dyn-lobby-card .play-btn { align-self: flex-start; margin: 0; }
+.dlc-done { font-size: 0.9rem; color: var(--good); font-weight: 600; }
+@media (max-width: 560px) { .dyn-lobby { grid-template-columns: 1fr; } }

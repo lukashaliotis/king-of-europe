@@ -7,7 +7,7 @@
 // ISOMORPHIC: runs unchanged in the browser (self-check) and in a Cloudflare Worker (authoritative).
 import { buildClubSeasons } from "./data.js";
 import { arenaFor } from "./arenas.js";
-import { replayDynastyRun } from "./dynasty.js";
+import { replayDynastyRun, buildDynastyBoard, dynastyWeekSeed } from "./dynasty.js";
 
 export const dynastyPools = (data) => buildClubSeasons(data);
 
@@ -29,7 +29,7 @@ function playerIndex(pools) {
  * @returns { ok:true, streak } | { ok:false, error }
  */
 export function resolveDynasty(data, submission, pools = null) {
-  const { seed, startFive, arena, choices } = submission || {};
+  const { board, seed, startFive, arena, choices } = submission || {};
   if (typeof seed !== "number" || !Number.isFinite(seed)) return { ok: false, error: "missing seed" };
   if (!Array.isArray(startFive) || startFive.length !== 5) return { ok: false, error: "a starting five is required" };
   if (choices != null && !Array.isArray(choices)) return { ok: false, error: "malformed choices" };
@@ -41,6 +41,29 @@ export function resolveDynasty(data, submission, pools = null) {
     const pl = s && idx.get(s.code + ":" + s.season);
     if (!pl) return { ok: false, error: "unknown player " + (s && s.code) };
     five.push(pl);
+  }
+
+  // The home arena must be one of the five's own clubs (it's spun from them).
+  if (arena && arena.teamCode && !five.some((p) => p._src.teamCode === arena.teamCode)) {
+    return { ok: false, error: "arena isn't one of your five's clubs" };
+  }
+
+  // Weekly runs must use the week's real seed AND a five drafted from the week's fixed board — this is
+  // what makes the weekly board fair (no seed-shopping, no off-board super-fives).
+  if (board && board !== "alltime") {
+    const expected = dynastyWeekSeed(board) >>> 0;
+    if (((Number(seed)) >>> 0) !== expected) return { ok: false, error: "wrong seed for this week" };
+    const draws = buildDynastyBoard(pools, expected);
+    const usedDraw = new Set();
+    for (const s of startFive) {
+      let hit = -1;
+      for (let j = 0; j < draws.length; j++) {
+        if (usedDraw.has(j)) continue;
+        if (draws[j].season === s.season && draws[j].players.some((p) => p.playerCode === s.code)) { hit = j; break; }
+      }
+      if (hit < 0) return { ok: false, error: "a starter isn't from this week's board" };
+      usedDraw.add(hit);
+    }
   }
 
   let mult = 1;

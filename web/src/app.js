@@ -7,7 +7,7 @@ import { eligibleCoaches, coachDeltas, archetypeLabel, pedigreeLabel } from "./c
 import { legendsPool, LEGENDS_CHANCE } from "./legends.js";
 import {
   mulberry32, hashSeed, utcDayKey, dailySeed, buildDailyBoard, rosterSignature,
-  shareText, weakestLink, STAGE_ICON, loadDaily, saveDaily, currentStreak, dailyHistory,
+  shareText, weakestLink, STAGE_ICON, loadDaily, saveDaily, currentStreak, dailyHistory, weekKey,
 } from "./daily.js";
 import { initOnboarding } from "./onboarding.js";
 import {
@@ -15,7 +15,7 @@ import {
 } from "./versus.js";
 import { SALARY_CAP, FLOOR as SALARY_FLOOR, playerCost, canAfford, formatMoney } from "./salary.js";
 import { getIdentity, saveName, submitDaily, fetchLeaderboard, submitDynasty, fetchDynastyBoard } from "./leaderboard.js";
-import { resolveGame, orderFive, canSwap, squadStrength, roundRng, drawFor, homeFor } from "./dynasty.js";
+import { resolveGame, orderFive, canSwap, squadStrength, roundRng, drawFor, homeFor, buildDynastyBoard, dynastyWeekSeed } from "./dynasty.js";
 
 const LEGENDS = legendsPool();
 
@@ -76,6 +76,9 @@ const state = {
   versusResult: null,   // { code } for the challenger, or the duel outcome for the responder
   versusError: null,
   dynasty: null,     // the gauntlet run: { started, round, streak, phase, squad, opp, home, arena, lastGame, pickIn, pickOut }
+  dynSub: null,      // Dynasty sub-mode: null (lobby) | "endless" (free draft, all-time) | "weekly" (shared board)
+  dynBoard: null,    // the week's fixed 5-draw draft board (weekly only)
+  dynWeekKey: null,  // the ISO week the board belongs to
 };
 let dragging = null;
 let spinTimer = null;
@@ -138,8 +141,22 @@ function setMode(mode) {
   document.body.dataset.mode = mode;
   if (mode === "daily") ensureDailyBoard();
   if (mode === "versus") resetVersus();
-  reset(); // clears the roster; keeps mode + board
+  if (mode === "dynasty") state.dynSub = null; // land on the Dynasty lobby (Weekly vs Endless)
+  reset(); // clears the roster; keeps mode + board + dynSub
 }
+
+// Enter a Dynasty sub-mode from the lobby. Weekly builds the week's fixed, shared draft board.
+function enterDynastySub(sub) {
+  state.dynSub = sub;
+  if (sub === "weekly") {
+    state.dynWeekKey = weekKey();
+    state.dynBoard = buildDynastyBoard(state.pools, dynastyWeekSeed(state.dynWeekKey));
+  }
+  reset();
+}
+const dynWeeklyKey = (wk) => "koe-dyn-week-" + wk;
+function loadWeekly(wk) { try { return JSON.parse(localStorage.getItem(dynWeeklyKey(wk)) || "null"); } catch (e) { return null; } }
+function saveWeekly(wk, streak) { try { localStorage.setItem(dynWeeklyKey(wk), JSON.stringify({ streak, at: Date.now() })); } catch (e) { /* ignore */ } }
 function ensureDailyBoard() {
   state.dailyDayKey = utcDayKey();
   state.dailyBoard = buildDailyBoard(state.pools, LEGENDS, LEGENDS_CHANCE, dailySeed(state.dailyDayKey), 6, state.data.seasons);
@@ -262,14 +279,19 @@ function doSpin(mode) {
       target = state.versusBoard[pickedCount()]; // the matchup's shared draw
       if (!target) return;
     } else if (state.mode === "dynasty") {
-      target = spinUniform(state.pools); // unweighted draft, no legends — start modest
+      if (state.dynSub === "weekly") {
+        target = state.dynBoard[pickedCount()]; // the week's fixed draw for this pick
+        if (!target) return;
+      } else {
+        target = spinUniform(state.pools); // endless: unweighted free draft, start modest
+      }
     } else {
       // rare nugget: sometimes the main spin lands the European Legends instead of a club
       target = Math.random() < LEGENDS_CHANCE ? LEGENDS : spin(state.pools);
     }
     reels = { club: true, year: true };
   } else {
-    if (state.mode === "daily" || state.mode === "versus") return; // no re-spins on a fixed board
+    if (state.mode === "daily" || state.mode === "versus" || (dynastyMode() && state.dynSub === "weekly")) return; // no re-spins on a fixed board
     if (!canRespin(mode)) return;
     state.respins[mode] = false;
     target = spin(respinPool(mode));
@@ -477,7 +499,9 @@ function startGauntlet() {
   state.dynasty = {
     started: true, round: 1, streak: 0, phase: "spin",
     squad: [...state.slots],
-    seed: (Math.random() * 0xffffffff) >>> 0,
+    sub: state.dynSub,
+    board: state.dynSub === "weekly" ? state.dynWeekKey : "alltime",
+    seed: state.dynSub === "weekly" ? (dynastyWeekSeed(state.dynWeekKey) >>> 0) : ((Math.random() * 0xffffffff) >>> 0),
     startFive: state.slots.map((p) => ({ code: p.playerCode, season: p.season })),
     choices: [],
     arena: base ? { mult: base.mult, name: base.name, rating: base.rating, cap: base.cap, teamCode: homeSlot._src.teamCode,
@@ -742,17 +766,19 @@ function renderControl() {
   const done = complete();
   // Once the season is revealed the spin bar is dead weight — hide it so the result/bracket claims
   // that vertical space and fits without scrolling.
-  el("control-bar").classList.toggle("hidden", (done && state.revealed) || inGauntlet());
+  el("control-bar").classList.toggle("hidden", (done && state.revealed) || inGauntlet() || (dynastyMode() && !state.dynSub));
   const info = el("pickinfo");
   if (done) info.textContent = state.revealed ? "Season played" : "Your team is set";
   else info.innerHTML = `Pick <b>${pickedCount() + 1}</b> of ${dynastyMode() ? 5 : 6}`; // Dynasty 5v5
   info.classList.toggle("done", done);
 
   el("spin-btn").disabled = done || !!state.offer || state.spinning || dailyLocked();
+  // Fixed-board modes (Daily, Versus, weekly Dynasty) draw a set board — no re-spins.
+  const fixedBoard = state.mode === "daily" || state.mode === "versus" || (dynastyMode() && state.dynSub === "weekly");
   for (const [mode, id] of [["club", "spin-club-btn"], ["year", "spin-year-btn"], ["both", "spin-both-btn"]]) {
     const btn = el(id);
     const spent = !state.respins[mode];
-    btn.disabled = done || state.spinning || !canRespin(mode);
+    btn.disabled = done || state.spinning || fixedBoard || !canRespin(mode);
     btn.classList.toggle("used", spent);
     btn.title = spent ? "Already used this playthrough"
       : state.offer ? `Re-spin ${mode === "both" ? "club and year" : mode} (1 use)` : "Spin first, then you can re-spin";
@@ -878,6 +904,9 @@ function renderOffer() {
   const box = el("offer");
   if (complete()) { box.classList.add("hidden"); return; }
   box.classList.remove("hidden");
+
+  // Dynasty: choose Weekly or Endless in the lobby before drafting.
+  if (dynastyMode() && !state.dynSub) { renderDynastyLobby(box); return; }
 
   // Versus: choose a role before drafting (create a challenge, or answer a pasted code).
   if (state.mode === "versus" && !state.versusRole) { renderVersusIntro(box); return; }
@@ -1348,26 +1377,32 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 
 // After a run ends: post it to the all-time board (server re-simulates the streak) and show the
 // standings. No name yet → a small join form. Offline → the run still shows, board just says so.
+const dynBoardTitle = (board) => (board === "alltime" ? "👑 All-time streaks" : `🗓 This week · ${board}`);
+
+// The run-over leaderboard: post the finished run (once) to its board — all-time or this week's — then
+// show the standings. A weekly run also locks the week's ranked attempt.
 async function dynastyOverBoard() {
   const box = el("dyn-lb"); if (!box) return;
   const d = state.dynasty;
+  if (d.sub === "weekly" && !d.savedWeekly) { saveWeekly(d.board, d.streak); d.savedWeekly = true; }
+  const title = dynBoardTitle(d.board);
   // A 0-win run doesn't make the board — no point posting or offering to join.
   if (d.streak === 0) { box.innerHTML = `<div class="dyn-lb-status">Win at least one game to make the leaderboard.</div>`; return; }
   const id = getIdentity();
-  if (!id || !id.name) { renderDynNameEntry(box); return; }
+  if (!id || !id.name) { renderDynNameEntry(box, title); return; }
   box.innerHTML = `<div class="dyn-lb-status">Posting your run…</div>`;
   try {
-    const data = d.submitted ? await fetchDynastyBoard("alltime", id.uid) : await postDynastyRun("alltime");
+    const data = d.submitted ? await fetchDynastyBoard(d.board, id.uid) : await postDynastyRun(d.board);
     d.submitted = true;
-    renderDynBoard(box, data);
+    renderDynBoard(box, data, title);
   } catch (e) {
     box.innerHTML = `<div class="dyn-lb-status off">Leaderboard offline — your streak: 🔥 ${d.streak}</div>`;
   }
 }
 
-function renderDynNameEntry(box) {
+function renderDynNameEntry(box, title) {
   box.innerHTML =
-    `<div class="dyn-lb-head">👑 All-time streaks</div>` +
+    `<div class="dyn-lb-head">${title || "👑 All-time streaks"}</div>` +
     `<div class="dyn-lb-join"><input id="dyn-name" class="dyn-name-input" maxlength="20" placeholder="Enter a name to join" />` +
       `<button id="dyn-join" class="mini-btn">Join</button></div>`;
   const input = el("dyn-name"), join = el("dyn-join");
@@ -1387,14 +1422,49 @@ function postDynastyRun(board) {
   });
 }
 
-function renderDynBoard(box, data) {
+function renderDynBoard(box, data, title) {
   const rows = (data.top || []).map((r) =>
     `<li class="${data.you && r.rank === data.you.rank ? "me" : ""}"><span class="lb-rank">${r.rank}</span>` +
     `<span class="lb-name">${esc(r.name)}</span><span class="lb-streak">🔥 ${r.streak}</span></li>`).join("");
   box.innerHTML =
-    `<div class="dyn-lb-head">👑 All-time streaks</div>` +
+    `<div class="dyn-lb-head">${title || "👑 All-time streaks"}</div>` +
     (rows ? `<ol class="dyn-lb-list">${rows}</ol>` : `<div class="dyn-lb-status">Be the first to post a streak.</div>`) +
     (data.you ? `<div class="dyn-lb-you">You're <b>#${data.you.rank}</b> of ${data.total} · best <b>🔥 ${data.you.streak}</b></div>` : "");
+}
+
+// Fetch + render a board into a container (read-only), with graceful offline handling.
+async function loadDynBoard(container, board) {
+  const id = getIdentity();
+  container.innerHTML = `<div class="dyn-lb-status">Loading…</div>`;
+  try { renderDynBoard(container, await fetchDynastyBoard(board, id && id.uid), dynBoardTitle(board)); }
+  catch (e) { container.innerHTML = `<div class="dyn-lb-status off">Leaderboard offline.</div>`; }
+}
+
+// The Dynasty lobby: choose the Weekly shared challenge or an Endless run, with this week's standings.
+function renderDynastyLobby(box) {
+  const wk = weekKey();
+  const played = loadWeekly(wk);
+  box.innerHTML =
+    `<div class="dyn-lobby">` +
+      `<div class="dyn-lobby-card weekly">` +
+        `<div class="dlc-tag">🗓 Weekly Challenge</div>` +
+        `<h3>The same gauntlet for everyone</h3>` +
+        `<p>Draft from this week's fixed board, then survive the shared gauntlet. One ranked run — compare your streak worldwide.</p>` +
+        (played
+          ? `<div class="dlc-done">Played this week — 🔥 <b>${played.streak}</b>. New board Monday.</div>`
+          : `<button id="dyn-weekly-go" class="play-btn">Play this week</button>`) +
+      `</div>` +
+      `<div class="dyn-lobby-card endless">` +
+        `<div class="dlc-tag">♾️ Endless Run</div>` +
+        `<h3>Draft your own five</h3>` +
+        `<p>Free draft, a fresh random gauntlet each time. Chase your all-time best streak.</p>` +
+        `<button id="dyn-endless-go" class="play-btn">Start a run</button>` +
+      `</div>` +
+    `</div>` +
+    `<div class="dyn-lb" id="dyn-lobby-lb"></div>`;
+  const wg = el("dyn-weekly-go"); if (wg) wg.addEventListener("click", () => enterDynastySub("weekly"));
+  const eg = el("dyn-endless-go"); if (eg) eg.addEventListener("click", () => enterDynastySub("endless"));
+  loadDynBoard(el("dyn-lobby-lb"), wk); // this week's standings, front and centre
 }
 
 function renderDynasty(card) {
@@ -1453,9 +1523,9 @@ function renderDynasty(card) {
           `<div class="rc-gate">${GATE_PHRASE[res.gateCategory] || ""}</div>` +
         `</div>` +
         `<div class="dyn-lb" id="dyn-lb"></div>` +
-        `<button id="dyn-again" class="play-btn">↻ New dynasty</button>` +
+        `<button id="dyn-again" class="play-btn">${d.sub === "weekly" ? "← Dynasty lobby" : "↻ New dynasty"}</button>` +
       `</div>`;
-    el("dyn-again").addEventListener("click", () => reset());
+    el("dyn-again").addEventListener("click", () => { if (d.sub === "weekly") state.dynSub = null; reset(); });
     dynastyOverBoard();
     return;
   }

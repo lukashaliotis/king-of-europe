@@ -140,6 +140,52 @@ export function canSwap(five, incoming, outIndex) {
 
 export const squadStrength = (five, seasons) => Sof(five, seasons);
 
+/* ---------------- the weekly shared challenge ---------------- */
+
+// The seed for a given ISO week — drives BOTH the fixed draft board and the gauntlet, so everyone
+// worldwide gets the identical challenge that week.
+export const dynastyWeekSeed = (weekKey) => hashSeed("KOE-DYN-" + weekKey);
+
+// Can one player be taken from each of the board's draws to field a legal 2G/2F/1C five? (bipartite
+// matching of the draws to the slots [G,G,F,F,C], solved by tiny backtracking).
+function boardCanFieldLegalFive(board) {
+  const avail = board.map((pool) => { const s = new Set(); for (const p of pool.players) s.add(p.pos); return s; });
+  const slots = ["G", "G", "F", "F", "C"];
+  const usedDraw = new Array(board.length).fill(false);
+  const assign = (i) => {
+    if (i >= slots.length) return true;
+    for (let d = 0; d < board.length; d++) {
+      if (!usedDraw[d] && avail[d].has(slots[i])) {
+        usedDraw[d] = true;
+        if (assign(i + 1)) return true;
+        usedDraw[d] = false;
+      }
+    }
+    return false;
+  };
+  return assign(0);
+}
+
+// The week's fixed draft board: `size` distinct club-years drawn UNIFORMLY (Dynasty's modest-start
+// ethos — no strength bias, no legends), deterministically reseeded until a legal five is achievable.
+// Everyone on the same week seed gets the identical board.
+export function buildDynastyBoard(pools, seed, size = 5) {
+  let fallback = null;
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const rng = mulberry32(hashSeed("KOE-DYN-BOARD:" + seed + ":" + attempt));
+    const board = []; const used = new Set(); let g = 0;
+    while (board.length < size && g++ < 500) {
+      const pool = pools[Math.floor(rng() * pools.length)];
+      if (used.has(pool.id)) continue;
+      used.add(pool.id); board.push(pool);
+    }
+    if (board.length !== size) continue;
+    if (boardCanFieldLegalFive(board)) return board;
+    if (!fallback) fallback = board;
+  }
+  return fallback;
+}
+
 /* ---------------- determinism (for replay + the leaderboards) ---------------- */
 
 // A per-round RNG stream, a PURE function of (runSeed, round, salt) — so the opponent draw and the

@@ -20,7 +20,7 @@ export async function onRequestPost({ request, env }) {
   try { data = await loadDataset(env, request); }
   catch { return json({ ok: false, error: "server data unavailable" }, 503); }
 
-  const res = resolveDynasty(data, { seed, startFive, arena, choices });
+  const res = resolveDynasty(data, { board, seed, startFive, arena, choices });
   if (!res.ok) return json(res, 400);
 
   // Keep the BEST streak per (board, device): update only when this run beats the stored one.
