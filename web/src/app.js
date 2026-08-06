@@ -1540,7 +1540,7 @@ function renderDynastyLobby(box) {
 function renderDynasty(card) {
   const d = state.dynasty;
   const opp = d.opp;
-  const oppName = `${badge(opp.teamCode)} <b>${prettyName(opp.teamName)}</b> <span class="muted">${opp.seasonLabel}</span>`;
+  const oppName = `${badge(opp.teamCode)} <b>${opp.teamName}</b> <span class="muted">${opp.seasonLabel}</span>`;
 
   // ---- (1) spinning up the next challenger ----
   if (d.phase === "spinTeam") {
@@ -1560,7 +1560,7 @@ function renderDynasty(card) {
       dynHeader(d, `Round ${d.round}`) +
       `<div class="dyn-loc-spin"><span class="dyn-loc-cap">Home or away —</span> ` +
         `<span class="dyn-loc-reel" id="dyn-loc-reel">· · ·</span></div>` +
-      `<div class="dyn-abovecourt">${badge(opp.teamCode)} ${prettyName(opp.teamName)} <span class="muted">${opp.seasonLabel}</span></div>` +
+      `<div class="dyn-abovecourt">${badge(opp.teamCode)} ${opp.teamName} <span class="muted">${opp.seasonLabel}</span></div>` +
       dynastyCourtHTML(d, false);
     return;
   }
@@ -1625,7 +1625,7 @@ function renderDynasty(card) {
       dynHeader(d, `Round ${d.round} won`) +
       `<div class="dyn-scoreline win">Beat ${oppName} ${lg.mine}–${lg.theirs}</div>` +
       `<h3 class="dyn-loot">Pick 1 player</h3>` +
-      `<p class="dyn-sub">Recruit one from ${prettyName(opp.teamName)} — you'll choose who to release next.</p>` +
+      `<p class="dyn-sub">Recruit one from ${opp.teamName} — you'll choose who to release next.</p>` +
       `<div class="dyn-plist">${rows}</div>`;
     card.querySelectorAll("[data-in]").forEach((b) =>
       b.addEventListener("click", () => { d.pickIn = b.dataset.in; d.pickOut = null; d.recruitStep = "out"; render(); }));
@@ -1660,7 +1660,7 @@ function renderDynasty(card) {
   card.innerHTML =
     dynHeader(d, `Round ${d.round}`) +
     `<div class="dyn-loc ${d.home ? "home" : "away"}">${d.home ? "🏠 Home — " + (d.arena ? d.arena.name : "your floor") : "✈️ Away — " + opp.arenaName}</div>` +
-    `<div class="dyn-abovecourt">${badge(opp.teamCode)} ${prettyName(opp.teamName)} <span class="muted">${opp.seasonLabel}</span></div>` +
+    `<div class="dyn-abovecourt">${badge(opp.teamCode)} ${opp.teamName} <span class="muted">${opp.seasonLabel}</span></div>` +
     dynastyCourtHTML(d, true) +
     `<div class="dyn-play-wrap"><button id="dyn-play" class="play-btn">▶ Play the game</button></div>`;
   el("dyn-play").addEventListener("click", playGauntletGame);
@@ -1893,7 +1893,7 @@ function dynastyShareCardData() {
     five,
     arena: d.arena ? d.arena.name : null,
     homeColor: d.arena ? d.arena.primary : null, homeAbbr: d.arena ? d.arena.abbr : null,
-    fellTo: d.opp ? `${prettyName(d.opp.teamName)} ${d.opp.seasonLabel}` : null,
+    fellTo: d.opp ? `${d.opp.teamName} ${d.opp.seasonLabel}` : null,
     fellScore: d.lastGame ? `${d.lastGame.theirs}–${d.lastGame.mine}` : null,
   };
 }
