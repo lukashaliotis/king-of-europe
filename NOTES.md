@@ -110,3 +110,25 @@ which is what the result screen and the Team Report look at, and remains the def
 The bars are now meaningful from the first pick rather than telling every partial roster it is far
 below par at everything.
 
+## "What three bigs?" — career-modal interior (2026-09-10)
+
+A report said "All three bigs share the floor" over a court showing a guard, a wing and a centre.
+The three it meant were Clancy, Eze and **Bodiroga** — a 2.05m point-forward and one of the great
+European wings.
+
+`interior` was computed per SEASON, so a tweener disagreed with himself. Bodiroga read as a wing in
+2001, 2002 and 2006 and as an interior big in 2003 and 2004, because in those two years his
+three-point volume dipped and the height term carried him barely over the line: bigness +0.44 and
++0.83, against +1.0 to +5.2 for every genuine big.
+
+`pos` has been career-modal since the start, for exactly this reason ("the roster API disagrees with
+itself for tweeners"). `interior` now is too — per-season score first, then a games-weighted career
+vote, centres and guards skipping it. Raising the per-season bar instead was tried and is worse: it
+clears Bodiroga but also drops a Mirotić season and a Shengelia season, and moves twice as many rows
+(5.5% against 2.7%).
+
+Second half of the same complaint: the court ALWAYS draws one SF, one PF and one C, because those are
+SLOTS rather than readings of who the players are. So "three bigs" would look wrong against it even
+when the classification is right. The shape lines now name them — "All three bigs (Martin, Childress
+& Chiacig) share the floor" — which answers the question on the line itself.
+

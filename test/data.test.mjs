@@ -73,3 +73,31 @@ test("the pools are strongest-first, which the offer screen relies on", () => {
   }
   assert.ok(pools.length > 500, `only ${pools.length} club-seasons`);
 });
+
+test("the interior flag is a career reading, not a per-season coin flip", () => {
+  // Judged one season at a time, a tweener disagrees with himself: Dejan Bodiroga — a 2.05m
+  // point-forward, one of the great European wings — read as a wing in three seasons and an interior
+  // big in the two where his three-point volume dipped and his height carried him over the line. A
+  // five holding him was told "all three bigs share the floor" over a court showing a guard, a wing
+  // and a centre. `pos` has always been career-modal for exactly this reason; `interior` now is too.
+  const byCode = new Map();
+  for (const p of data.players) {
+    if (!p.box || p.pos === "C" || p.pos === "G") continue;
+    if (!byCode.has(p.playerCode)) byCode.set(p.playerCode, []);
+    byCode.get(p.playerCode).push(p.interior);
+  }
+  for (const [code, flags] of byCode) {
+    const uniq = new Set(flags);
+    assert.equal(uniq.size, 1, `${code} flips interior between seasons`);
+  }
+});
+
+test("known wings are wings and known bigs are bigs", () => {
+  const roleOf = (frag) => {
+    const rows = data.players.filter((p) => p.box && p.gp >= 8 && p.playerName.toUpperCase().includes(frag));
+    assert.ok(rows.length, `${frag} is no longer in the dataset`);
+    return rows.filter((p) => p.interior).length / rows.length;
+  };
+  for (const w of ["BODIROGA", "WEEMS", "PRELDŽIĆ"]) assert.equal(roleOf(w), 0, `${w} should never be interior`);
+  for (const b of ["MIROTIĆ", "SHENGELIA", "VESELÝ", "PLEISS", "MITOGLOU"]) assert.equal(roleOf(b), 1, `${b} should always be interior`);
+});

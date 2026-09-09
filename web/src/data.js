@@ -107,6 +107,33 @@ export function deriveRoles(data) {
     // playmakers inside. Only flips a handful of forwards, all genuine bigs.
     p.bigness = big; p.interior = big >= 0 || (big >= -0.5 && zh >= 0.6 && zreb >= 0.5); p.pos5 = p.interior ? "PF" : "SF";
   }
+  // CAREER-MODAL INTERIOR, for exactly the reason applyCareerPositions collapses `pos`: judged one
+  // season at a time, a tweener disagrees with himself. Dejan Bodiroga — a 2.05m point-forward, one of
+  // the great European WINGS — came out a wing in 2001, 2002 and 2006 and an interior big in 2003 and
+  // 2004, because in those two years his three-point volume dipped and the height term carried him
+  // barely over the line (bigness +0.44 and +0.83, against +1.0 to +5.2 for every genuine big). A five
+  // holding him was then told "all three bigs share the floor" while the court showed a guard, a wing
+  // and a centre.
+  //
+  // So the per-season score decides, then his CAREER decides, weighted by games played the same way
+  // the position vote is. Raising the per-season bar instead was tried and is worse: it clears
+  // Bodiroga but also drops a Mirotić season and a Shengelia season, and moves twice as many rows.
+  // Centres and guards are never in doubt and skip the vote.
+  const intVotes = new Map(); // playerCode -> { yes, no } in games
+  for (const p of P) {
+    if (p.pos === "C" || p.pos === "G") continue;
+    const v = intVotes.get(p.playerCode) || { yes: 0, no: 0 };
+    const w = Math.max(1, p.gp || 0);
+    if (p.interior) v.yes += w; else v.no += w;
+    intVotes.set(p.playerCode, v);
+  }
+  for (const p of P) {
+    if (p.pos === "C" || p.pos === "G") continue;
+    const v = intVotes.get(p.playerCode);
+    if (!v) continue;
+    p.interior = v.yes >= v.no;
+    p.pos5 = p.interior ? "PF" : "SF";
+  }
   return data;
 }
 

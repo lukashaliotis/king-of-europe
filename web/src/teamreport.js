@@ -121,7 +121,11 @@ export function teamReport(res, five, opts, data) {
   const bigsStretch = bigs.filter((p) => { const a = archetypeOf(p, data); return a && a.key === "stretch_big"; });
   const allBigsStretch = bigs.length >= 2 && bigsStretch.length === bigs.length;
   const pgs = guards.filter((p) => p.pos5 === "PG");
-  const bigsWord = bigs.length === 2 ? "Both bigs" : "All " + (bigs.length === 3 ? "three" : "four") + " bigs";
+  // NAME them. The court always draws one SF, one PF and one C because those are SLOTS, not readings
+  // of who the players are — so a line saying "all three bigs" reads as plainly wrong against it, and
+  // the reader's first question is which three. Naming answers it on the line itself.
+  const bigNames = nameList(bigs.map((p) => surname(p.playerName)));
+  const bigsWord = bigs.length === 2 ? `Both bigs (${bigNames})` : `All ${bigs.length === 3 ? "three" : "four"} bigs (${bigNames})`;
   // When the SHAPE is the cause, the cure is a different KIND of player, not more quality at the same
   // position — the generic per-category hint would tell a side already carrying three stretch bigs to
   // go and add floor spacing. Keyed by category, and only reachable when the matching shape branch
@@ -172,7 +176,7 @@ export function teamReport(res, five, opts, data) {
   S("defense", perimZ > 1.0 && perimZ > rimZ, pick(["Strong perimeter pressure from the guards generates steals.", "The backcourt contains the perimeter and forces turnovers."]));
   // specific diagnosis: name whichever of rim / perimeter is the real hole
   W("defense",
-    bigs.length === 0 ? "No true big in the five, so there is nothing protecting the rim by design."
+    bigs.length === 0 ? "Not one of the five is a true interior player, so nothing protects the rim."
     : rimZ <= perimZ
     // Don't claim NOTHING is there when someone is. rimZ is a team average over the bigs, so a lone
     // real shot-blocker beside a passenger still averages low - the same absence-vs-presence trap the
@@ -201,7 +205,7 @@ export function teamReport(res, five, opts, data) {
   const worstReb = five.length ? [...five].sort((a, b) => z(a, "reb", data) - z(b, "reb", data))[0] : null;
   W("rebounding",
     // The lineup explains the glass before any individual does.
-    bigs.length === 0 ? "No true big in the five, so the glass is conceded by design."
+    bigs.length === 0 ? "Not one of the five is a true interior player, so the glass is conceded by design."
     : allBigsStretch ? `${bigsWord} play outside, so nobody is left on the glass.`
     : bigs.length === 1 ? "Only one true big in the five, so the frontcourt is outsized."
     : guards.length >= 3 ? "Three guards on the floor, so this five simply gets outsized on the glass."
@@ -337,7 +341,7 @@ export function teamReport(res, five, opts, data) {
     // single fact causing both halves, and it was being lost precisely in the reports that needed it
     // most (every silent shape case in the audit was this merge swallowing a one-big frontcourt).
     const merged = { cat: "interior", text:
-      bigs.length === 0 ? "No true big in the five, so there is neither rim protection nor rebounding."
+      bigs.length === 0 ? "Not one of the five is a true interior player: no rim protection and no rebounding."
       : allBigsStretch ? `${bigsWord} play out on the arc, so the paint goes unguarded and the glass unmanned.`
       : bigs.length === 1 ? `Only one true big in the five, and ${surname(bigs[0].playerName)} cannot cover the rim and the glass at once.`
       // Absence is the wrong word when the frontcourt is CROWDED. Three bigs and still nothing at the
