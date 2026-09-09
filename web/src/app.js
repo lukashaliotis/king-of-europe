@@ -3519,7 +3519,7 @@ const gateLineHTML = (res) =>
   `<span class="rc-gate-i">${icon("info")}</span></button>`;
 // Champion: instead of hiding the report entirely, a celebratory line that opens the victory-lap report.
 const championLineHTML = () =>
-  `<button class="rc-gate rc-champ" id="rc-champ-btn" type="button">${icon("trophy", "gold")} Your championship five` +
+  `<button class="rc-gate rc-champ" id="rc-champ-btn" type="button">${icon("trophy", "gold")} Your championship team` +
   `<span class="rc-gate-i">${icon("info")}</span></button>`;
 
 function renderResult() {
