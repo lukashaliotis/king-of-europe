@@ -170,3 +170,32 @@ test("a volume scorer is never described as a defender", () => {
   assert.equal(a.key, "volume_scorer");
   assert.ok(!a.supplies, "a volume scorer should not be claimable as anything else");
 });
+
+test("a Fix ends with something to DO", () => {
+  // The "you already have one" family used to stop at the diagnosis — "X already gives you floor
+  // spacing, the other four give defenses nothing to worry about outside" says what is fine and then
+  // stops, which is why it read as filler however rarely it fired.
+  const ADVISES = /\b(would|should|needs?|put|add|trade|swap|the fix is|has to be|is the signing)\b/i;
+  for (const { rp } of reports) {
+    assert.ok(ADVISES.test(rp.hint), `Fix gives no instruction: ${rp.hint}`);
+  }
+});
+
+test("plural agreement holds when names are listed", () => {
+  for (const { rp } of reports) {
+    for (const t of [...rp.strengths, ...rp.weaknesses].map((x) => x.text).concat(rp.hint || "")) {
+      assert.doesNotMatch(t, /,.*&.*\bboth\b/, `three names and "both": ${t}`);
+      assert.doesNotMatch(t, /&[^,]*\ball of\b/, `two names and "all": ${t}`);
+    }
+  }
+});
+
+test("the bench shout-out reads as a strength", () => {
+  // It sits under Strengths, so it must not lead with the gap: "Your best creation comes from X, off
+  // the bench - the one thing this five is short of" was a complaint wearing a strength's clothes.
+  for (const { rp } of reports) {
+    for (const s of rp.strengths) {
+      assert.doesNotMatch(s.text, /the one thing this five is short of/, `a Strength that reads as a complaint: ${s.text}`);
+    }
+  }
+});

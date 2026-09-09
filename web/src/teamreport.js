@@ -444,9 +444,12 @@ export function teamReport(res, five, opts, data) {
     const who = rosterArchetypes(five, data)
       .filter(({ arch }) => arch && arch.caps[cap] && arch.traits.confidence >= 0.6)
       .map(({ player }) => surname(player.playerName));
+    // A Fix has to end on an INSTRUCTION. These used to stop at the diagnosis — "X already gives you
+    // floor spacing, the other four give defenses nothing to worry about outside" says what is fine
+    // and then stops, which is why they read as filler however rarely they fire (15.5% of Fixes).
     hint = who.length === 1
-      ? `${who[0]} already gives you ${CAP_WORD[cap]} - ${CAP_ALONE[cap]}`
-      : `${CAP_PRESENT[cap]} ${nameList(who)} already do it, so this is about quality, not another signing.`;
+      ? `${who[0]} gives you ${CAP_WORD[cap]} on his own - ${CAP_ALONE[cap]}`
+      : `${CAP_PRESENT[cap]} ${nameList(who)} ${who.length > 2 ? "all" : "both"} do it, so ${CAP_QUALITY[cap]}`;
   }
 
   // ---------- COACH, SIXTH MAN, HOME COURT ----------
@@ -491,9 +494,10 @@ export function teamReport(res, five, opts, data) {
     // The engine already discounts a ball-dominant reserve (benchValue); the player was never told.
     const lost = sa ? Math.round(100 * Math.max(0, (sa.traits.usage - 0.20) / 0.20) * 0.27 / 0.92) : 0;
     if (covers) {
-      const line = rosterHas(five, covers, data)
-        ? `Your best ${CAP_WORD[covers]} comes from ${sn}, off the bench - the one thing this five is short of.`
-        : `${sn} is the only ${CAP_NOUN[covers]} on the roster, and he's coming off the bench.`;
+      // This sits under STRENGTHS, so it has to read like one. "Your best creation comes from X, off
+      // the bench - the one thing this five is short of" is a complaint wearing a strength's clothes:
+      // it leads with the gap instead of the man filling it.
+      const line = `${sn} runs the second unit and gives it the ${CAP_WORD[covers]} the starters are short of.`;
       bonus.push({ cat: "bench", text: line });
     }
     else if (lost >= 20) picked.push({ cat: "bench", text: `${sn} is a ball-dominant starter cast as a reserve, and a good deal of what he does is lost in a bench role.` });
@@ -558,12 +562,21 @@ const CAP_CAT = { spacing: "efficiency", rim: "defense", glass: "rebounding", cr
 const CAP_NOUN = { spacing: "outside shooter", rim: "rim protector", glass: "real rebounder",
   creator: "creator", stopper: "perimeter defender" };
 const CAP_WORD = { spacing: "floor spacing", rim: "rim protection", glass: "rebounding", creator: "creation", stopper: "perimeter defense" };
+// Each ends with the thing to DO, not the thing that is already true.
 const CAP_ALONE = {
-  spacing: "the other four give defenses nothing to worry about outside.",
-  rim: "he is protecting the rim alone, and one big cannot cover the whole paint.",
-  glass: "he is boxing out alone while the other four leak second chances.",
-  creator: "he is creating alone, and the offense stops whenever he sits.",
-  stopper: "he is guarding the perimeter alone, and offenses simply attack elsewhere.",
+  spacing: "put a second shooter beside him, or defenses will keep helping off the other four.",
+  rim: "he cannot cover the whole paint by himself; a second big is the signing.",
+  glass: "he is boxing out alone, so the help has to be another body on the glass.",
+  creator: "the offense stops whenever he sits, so the bench needs a ball-handler of its own.",
+  stopper: "offenses will simply attack elsewhere; the other perimeter spot needs a defender.",
+};
+// ...and the same when TWO men already supply it, where the answer is never another one of them.
+const CAP_QUALITY = {
+  spacing: "the fix is better looks, not more shooters.",
+  rim: "the fix is holding the defensive glass, not another big.",
+  glass: "the fix is boxing out as a five, not another rebounder.",
+  creator: "the fix is looking after the ball, not another passer.",
+  stopper: "the fix is team defense, not another stopper.",
 };
 const CAP_PRESENT = {
   spacing: "The shooting is already on the floor -", rim: "The rim protection is already there -",

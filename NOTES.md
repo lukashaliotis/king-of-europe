@@ -181,3 +181,29 @@ who drags it is the one taking a big share of the shots and missing them. Where 
 the shrug STAYS — checked, and in those reports the top-usage player shoots 58% TS, so there is
 genuinely nobody to name. Generic lines overall: 5.2% -> 4.1%.
 
+## The Fix has to say what to DO (2026-09-10)
+
+Lukas on the bench line — "why not say that Moneke creates from the bench making an impact and
+leading the bench unit?" — and on the Fix, "this fix message seems to come up often."
+
+The bench line sat under STRENGTHS and read as a complaint: "Your best creation comes from Moneke,
+off the bench - the one thing this five is short of" leads with the gap instead of the man filling
+it. Now: "Moneke runs the second unit and gives it the creation the starters are short of."
+
+The Fix is the more interesting one. Measured, that exact line is 4.4% of Fixes and the whole "you
+already have one" family is 15.5%, across 36 distinct Fixes — so it is not actually frequent. What
+made it FEEL frequent is that it ends on a DIAGNOSIS rather than an instruction: "Shields already
+gives you floor spacing - the other four give defenses nothing to worry about outside" says what is
+fine and then stops. A line that gives you nothing to do reads as filler however rarely it fires.
+
+Every one of them now ends with the action, and the action differs by whether ONE man supplies the
+capability (get him help) or TWO already do (the problem is not personnel):
+
+  Pangos gives you floor spacing on his own - put a second shooter beside him, or defenses will
+  keep helping off the other four.
+  The shooting is already on the floor - Toure, Savanovic & Mickey all do it, so the fix is better
+  looks, not more shooters.
+
+Guarded by a test that every Fix contains an instruction, and by one for plural agreement after
+"Toure, Savanovic & Mickey BOTH do it" slipped through.
+
