@@ -95,3 +95,18 @@ Caught while testing: the first derivation had no reliability shrinkage, so a 7-
 two threes a night in 2009 came back at z 8.6 and could drag a whole five on his own. 54 rows cleared
 |z| > 3; none do now.
 
+## Category bars: a per-stage reference (2026-09-10)
+
+Centring the bars on "typical" (the change that made the bar geometry and the weak-link label agree)
+had a bug I did not catch: the reference was a FINISHED team, and the bars are drawn while you draft.
+An untouched board — every category score exactly 0 — is a long way below a finished five, so it drew
+five long bars. It read as though you already had a team before pressing Spin.
+
+`catZ` now takes a STAGE. `STAGE_MEAN` has one row per number of picks made: row 0 is all zeroes, so
+an untouched board reads as exactly typical for an untouched board and draws nothing; rows 1-5 are
+the bare five as it comes together; row 6 is the finished build (five + sixth man + coach + arena),
+which is what the result screen and the Team Report look at, and remains the default.
+
+The bars are now meaningful from the first pick rather than telling every partial roster it is far
+below par at everything.
+

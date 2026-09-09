@@ -1,14 +1,17 @@
 // Category balance — the five bars beside the court, and the weak-link label under them.
 //
 // Pure presentation: every function takes numbers and returns geometry or markup. Nothing here reads
-// the game state, so the same helpers serve the drafting sidebar, the mobile balance popup and the
+// the game state. Each takes a `stage` — how many of the five are drafted — so a half-built roster is
+// judged against a typical half-built roster instead of against a finished team; an untouched board
+// then draws no bars at all, which is what an untouched board should look like.
+// Nothing here reads the game state, so the same helpers serve the drafting sidebar, the mobile balance popup and the
 // result card without any of them knowing about each other.
 //
 // The geometry and the weak-link label MUST agree. They once used different measures — score/mean for
 // the bars, score-mean for the report — and disagreed about which category was shortest 55% of the
 // time, so the write-up argued with the picture above it. Both now run on engine.catZ; if you change
 // one, change the other in the same edit.
-import { CATEGORIES, catZ } from "./engine.js";
+import { CATEGORIES, catZ, FINAL_STAGE } from "./engine.js";
 
 // The bars are centred on TYPICAL, not on zero, and measured in engine.catZ. Two things that fixes:
 //  · the shortest bar is a fair comparison. Dividing by the mean let the two volatile categories
@@ -19,8 +22,8 @@ import { CATEGORIES, catZ } from "./engine.js";
 // five picks, so the bars fill rightward toward the centre as the five comes together.
 const Z_SPAN = 2.6;     // z at which a bar reaches the end of its half (p99 of finished fives)
 const BAR_CURVE = 1.0;  // linear in z — the curve existed to slow a ratio that jumped on pick one
-export function catBarGeom(score, k) {
-  const z = catZ(score, k);
+export function catBarGeom(score, k, stage = FINAL_STAGE) {
+  const z = catZ(score, k, stage);
   const ratio = Math.min(1, Math.abs(z) / Z_SPAN);
   const width = 50 * Math.pow(ratio, BAR_CURVE);
   return { left: z >= 0 ? 50 : 50 - width, width };
@@ -28,19 +31,19 @@ export function catBarGeom(score, k) {
 // The DISPLAYED weak point is the SHORTEST BAR, measured the same way the bar is drawn, so the
 // highlighted category is always visibly the shortest one. (The engine keeps its OWN `gateCategory`
 // for the simulation; that one is judged against a different reference and can legitimately differ.)
-export function weakestBarCat(categoryScores) {
+export function weakestBarCat(categoryScores, stage = FINAL_STAGE) {
   let worst = CATEGORIES[0], wv = Infinity;
   for (const k of CATEGORIES) {
-    const v = catZ(categoryScores ? categoryScores[k] || 0 : 0, k); // same measure the bar is drawn in
+    const v = catZ(categoryScores ? categoryScores[k] || 0 : 0, k, stage); // same measure the bar is drawn in
     if (v < wv) { wv = v; worst = k; }
   }
   return worst;
 }
 export const capCat = (k) => k.charAt(0).toUpperCase() + k.slice(1); // "defense" -> "Defense"
-export function catBarsHTML(res) {
-  const gateCat = res ? weakestBarCat(res.categoryScores) : null;
+export function catBarsHTML(res, stage = FINAL_STAGE) {
+  const gateCat = res ? weakestBarCat(res.categoryScores, stage) : null;
   return CATEGORIES.map((k) => {
-    const g = catBarGeom(res ? res.categoryScores[k] : 0, k);
+    const g = catBarGeom(res ? res.categoryScores[k] : 0, k, stage);
     return `<div class="cat-row${k === gateCat ? " isgate" : ""}"><span class="lbl">${capCat(k)}</span>` +
       `<div class="cat-track"><div class="cat-fill" style="left:${g.left}%; width:${g.width}%"></div></div></div>`;
   }).join("");
@@ -49,8 +52,8 @@ export function catBarsHTML(res) {
 // Update the drafting bars IN PLACE (don't rebuild the DOM), so the CSS transition animates each
 // change smoothly instead of snapping - the elements persist between picks and only their
 // width/position move.
-export function updateCatBars(container, res) {
-  const gateCat = res ? weakestBarCat(res.categoryScores) : null;
+export function updateCatBars(container, res, stage = FINAL_STAGE) {
+  const gateCat = res ? weakestBarCat(res.categoryScores, stage) : null;
   if (container.dataset.built !== "1") {
     container.innerHTML = CATEGORIES.map((k) =>
       `<div class="cat-row" data-cat="${k}"><span class="lbl">${capCat(k)}</span>` +
@@ -60,7 +63,7 @@ export function updateCatBars(container, res) {
   for (const k of CATEGORIES) {
     const row = container.querySelector(`.cat-row[data-cat="${k}"]`);
     const fill = row.querySelector(".cat-fill");
-    const g = catBarGeom(res ? res.categoryScores[k] : 0, k);
+    const g = catBarGeom(res ? res.categoryScores[k] : 0, k, stage);
     fill.style.left = g.left + "%";
     fill.style.width = g.width + "%";
     row.classList.toggle("isgate", k === gateCat);

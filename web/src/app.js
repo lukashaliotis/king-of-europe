@@ -2220,8 +2220,8 @@ function renderCats() {
   // A benched 6th man also nudges the bars (his positive z's, discounted), so compute the projection
   // whenever there's a starter OR a 6th — otherwise benching a player first left the bars dead-flat.
   const res = (picks.length || state.sixth) ? projectRecord(picks, state.data.seasons, undefined, 1, coachCatDeltas(), state.sixth, captainCode()) : null;
-  updateCatBars(el("cat-bars"), res);
-  el("gate-note").textContent = res && picks.length >= 2 ? `Weakest link: ${capCat(weakestBarCat(res.categoryScores))}` : "";
+  updateCatBars(el("cat-bars"), res, picks.length);
+  el("gate-note").textContent = res && picks.length >= 2 ? `Weakest link: ${capCat(weakestBarCat(res.categoryScores, picks.length))}` : "";
 }
 
 // The summary list, revealed one step at a time: seeding first (shown ≥ 1), then each round.

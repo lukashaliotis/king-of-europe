@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { projectRecord, seedFromRoster, gameProbability, CATEGORIES, GAMES, CAT_TYPICAL, DISPLAY_MEAN, DISPLAY_SCALE, catZ } from "../web/src/engine.js";
+import { projectRecord, seedFromRoster, gameProbability, CATEGORIES, GAMES, CAT_TYPICAL, DISPLAY_MEAN, DISPLAY_SCALE, FINAL_STAGE, catZ } from "../web/src/engine.js";
 import { coachDeltas } from "../web/src/coaches.js";
-import { data, builds, seasonOf, quantile } from "./helpers.mjs";
+import { data, pools, builds, seasonOf, quantile } from "./helpers.mjs";
 
 test("a projection is always finite and in range", () => {
   for (const b of builds(400, "spread", 1001)) {
@@ -149,4 +149,33 @@ test("stacking bigs is no longer a free optimum", () => {
   for (const r of rows) { const x = r.sp - ms, y = r.wins - mw; nu += x * y; ds += x * x; dw += y * y; }
   const corr = nu / Math.sqrt(ds * dw);
   assert.ok(corr > -0.13, `spacing still correlates ${corr.toFixed(3)} with wins — the term has stopped biting`);
+});
+
+test("an untouched board draws no bars", () => {
+  // The bars are drawn WHILE you draft, so "typical" has to mean typical at THIS stage. Judged
+  // against a finished team, an empty board — every score exactly 0 — came out as five long bars,
+  // which read as though you already had a team before pressing Spin.
+  for (const k of CATEGORIES) assert.equal(catZ(0, k, 0), 0, `${k}: an empty board is not neutral`);
+});
+
+test("a part-built roster is judged against a part-built roster", () => {
+  // Each stage's own reference, so the bars stay meaningful from the first pick rather than telling
+  // every partial roster it is far below par at everything.
+  const five = pools.find((p) => p.players.length >= 5).players.slice(0, 5);
+  for (let n = 1; n <= 5; n++) {
+    const res = projectRecord(five.slice(0, n), data.seasons);
+    for (const k of CATEGORIES) {
+      const z = catZ(res.categoryScores[k], k, n);
+      assert.ok(Number.isFinite(z) && Math.abs(z) < 8, `${n} picks, ${k}: z ${z}`);
+    }
+  }
+});
+
+test("the finished-build reference is the default", () => {
+  // teamReport and the result card call catZ without a stage; they are always looking at a complete
+  // build, so the default must be the finished-build row, not the bare five.
+  for (const k of CATEGORIES) {
+    assert.equal(catZ(DISPLAY_MEAN[k], k), 0, `${k}: default stage is not the finished build`);
+    assert.equal(catZ(DISPLAY_MEAN[k], k, FINAL_STAGE), catZ(DISPLAY_MEAN[k], k));
+  }
 });
