@@ -175,7 +175,7 @@ test("a Fix ends with something to DO", () => {
   // The "you already have one" family used to stop at the diagnosis — "X already gives you floor
   // spacing, the other four give defenses nothing to worry about outside" says what is fine and then
   // stops, which is why it read as filler however rarely it fired.
-  const ADVISES = /\b(would|should|needs?|put|add|trade|swap|the fix is|has to be|is the signing)\b/i;
+  const ADVISES = /\b(would|should|needs?|put|add|trade|swap|the fix is|has to|have to|is the signing)\b/i;
   for (const { rp } of reports) {
     assert.ok(ADVISES.test(rp.hint), `Fix gives no instruction: ${rp.hint}`);
   }
@@ -196,6 +196,38 @@ test("the bench shout-out reads as a strength", () => {
   for (const { rp } of reports) {
     for (const s of rp.strengths) {
       assert.doesNotMatch(s.text, /the one thing this five is short of/, `a Strength that reads as a complaint: ${s.text}`);
+    }
+  }
+});
+
+test("the report never claims something is absent while it is on the floor", () => {
+  // This class of bug has now appeared three times: "all three bigs" over a court showing a wing,
+  // "No rim protection" beside a shot-blocker, and "No interior presence" on every single team that
+  // had TWO bigs. An absence claim has to match the roster it is describing.
+  for (const { b, rp } of reports) {
+    const bigs = b.five.filter((p) => p.interior);
+    for (const w of rp.weaknesses) {
+      if (/No interior presence|Not one of the five is a true interior player|No true big in the five/.test(w.text)) {
+        assert.equal(bigs.length, 0, `claims no interior player while ${bigs.length} are on the floor: ${w.text}`);
+      }
+      if (/Nobody stretches the defense|No outside shooting|No floor spacing/.test(w.text)) {
+        assert.ok(!rosterHas(b.five, "spacing", data), `claims no spacing while someone supplies it: ${w.text}`);
+      }
+      if (/No rim protection|Little resistance at the rim/.test(w.text)) {
+        assert.ok(!rosterHas(b.five, "rim", data), `claims no rim protection while someone supplies it: ${w.text}`);
+      }
+    }
+  }
+});
+
+test("the Fix never asks for a position the five already has two of", () => {
+  // A side with a power forward and a centre was being told "a rim-protecting big would fix both",
+  // which is asking for a third big.
+  for (const { b, rp } of reports) {
+    const bigs = b.five.filter((p) => p.interior).length;
+    if (bigs >= 2) {
+      assert.doesNotMatch(rp.hint, /^A rim-protecting big|^A physical rebounding big|^A second big/,
+        `${bigs} bigs already, and the Fix asks for another: ${rp.hint}`);
     }
   }
 });

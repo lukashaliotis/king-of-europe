@@ -207,3 +207,28 @@ capability (get him help) or TWO already do (the problem is not personnel):
 Guarded by a test that every Fix contains an instruction, and by one for plural agreement after
 "Toure, Savanovic & Mickey BOTH do it" slipped through.
 
+## "No interior presence" with two bigs on the floor (2026-09-10)
+
+A report told a side with Thomas at power forward and Lavrinovic at centre that it had "No interior
+presence: no rim protection and no rebounding", then prescribed a rim-protecting big.
+
+Measured: EVERY ONE of the 407 reports using that wording had exactly two interior players on the
+floor. The shape work covered nought, one, three-plus and all-stretch frontcourts and left the
+two-big default still claiming absence — the one case where the claim is guaranteed false.
+
+Now it names them: "Papaioakim & Betts are the frontcourt, and neither protects the rim nor holds the
+glass", with a Fix that asks for quality rather than a third body.
+
+Writing the general test then caught three more of the same shape, all of them telling a side to sign
+a position it already fielded two of:
+
+- 3 bigs, rebounding the weak point -> "a physical rebounding big would shore up the glass"
+- 2 bigs, rim the defensive hole   -> "a rim-protecting big would help most"
+- 2 STRETCH bigs                    -> "a second big who plays inside" (they have two)
+
+This class of bug has now appeared four times across the session — "all three bigs" over a court
+showing a wing, "No rim protection" beside a shot-blocker, "No interior presence" with two bigs, and
+these three Fixes. Two tests now cover it generally rather than case by case: the report may not
+claim something is ABSENT while it is on the floor, and the Fix may not ask for a position the five
+already has two of.
+

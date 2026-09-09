@@ -139,10 +139,19 @@ export function teamReport(res, five, opts, data) {
     SHAPE_FIX.rebounding = "A second big alongside him would settle the glass; one man cannot hold it alone.";
   } else if (guards.length >= 3) {
     SHAPE_FIX.rebounding = "Trading a guard for size would do more than another rebounder - three guards cannot hold the glass.";
+  } else if (bigs.length >= 2) {
+    // Two or more bigs and still losing the glass is not a shortage of bigs. Without this a side with
+    // three of them was told "a physical rebounding big would shore up the glass" — asking for a fourth.
+    SHAPE_FIX.rebounding = "The size is already on the floor - these bigs have to go and get the ball, not be joined by another one.";
   }
   // the merged interior finding takes the same cure as the glass when a lineup shape caused it
-  if (bigs.length === 1 || allBigsStretch) SHAPE_FIX.interior = "A second big who plays inside would fix both ends of this at once.";
+  if (bigs.length === 1) SHAPE_FIX.interior = "A second big alongside him would fix both ends of this at once.";
+  // Two bigs who BOTH live on the arc is not a shortage of bigs, so "a second big" was the wrong ask.
+  else if (allBigsStretch) SHAPE_FIX.interior = "Your bigs both live out on the arc - one of them has to play inside, or be swapped for someone who does.";
   if (bigs.length >= 3) SHAPE_FIX.interior = "Size is not the problem here - one of these bigs needs to be a genuine rim protector and rebounder.";
+  // Two bigs is not a shortage of bigs. Without this the Fix told a side with a power forward and a
+  // centre that "a rim-protecting big would fix both", which is asking for a third.
+  if (bigs.length === 2 && !allBigsStretch) SHAPE_FIX.interior = "You have the size already - one of these two has to become the rim protector and rebounder, or be replaced by one.";
   if (bigs.length >= 3) SHAPE_FIX.efficiency = "A shooter on the wing would open the floor; right now the bigs are standing on each other.";
   if (guards.length <= 1 || pgs.length === 0) SHAPE_FIX.playmaking = "A natural point guard would settle this - nobody here runs an offense for a living.";
   const seed = hashCodes(five);
@@ -339,6 +348,13 @@ export function teamReport(res, five, opts, data) {
   // names both affected areas, so the Fix below can prescribe the actual cure (a big) rather than
   // treating either symptom on its own.
   const rimIsTheHole = rimZ <= perimZ;
+  // The rim-flavoured DEFENSE weakness has the same trap as rebounding and the interior merge: a side
+  // that already fields two bigs does not need a third, it needs one of them to protect the rim.
+  // (Set here rather than with the other shape fixes because it depends on which half of the defense
+  // finding fired, which is only known once rimZ and perimZ are in hand.)
+  if (rimIsTheHole && bigs.length >= 2) {
+    SHAPE_FIX.defense = "The size is already there - one of these bigs has to actually protect the rim.";
+  }
   const di = picked.findIndex((w) => w.cat === "defense");
   const ri = picked.findIndex((w) => w.cat === "rebounding");
   if (rimIsTheHole && di !== -1 && ri !== -1) {
@@ -355,7 +371,11 @@ export function teamReport(res, five, opts, data) {
       // rim or on the glass is a quality problem, and "no interior presence" flatly contradicts the
       // lineup the player is looking at.
       : bigs.length >= 3 ? `${bigsWord} on the floor and still nothing at the rim or on the glass.`
-      : "No interior presence: no rim protection and no rebounding." };
+      // The remaining case is TWO bigs, and it was the last place the merge still claimed absence.
+      // Measured: every single report using the old "No interior presence" wording had two interior
+      // players on the floor — so it told a team with a power forward and a centre that it had
+      // neither. Name them and say what they are failing to do instead.
+      : `${nameList(bigs.map((b) => surname(b.playerName)))} are the frontcourt, and neither protects the rim nor holds the glass.` };
     picked.splice(hi, 1); picked.splice(lo, 1);             // remove the HIGHER index first, or lo shifts
     picked.splice(Math.min(lo, picked.length), 0, merged);  // root cause takes the earlier of their slots
   }
