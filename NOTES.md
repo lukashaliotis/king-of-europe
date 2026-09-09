@@ -132,3 +132,30 @@ SLOTS rather than readings of who the players are. So "three bigs" would look wr
 when the classification is right. The shape lines now name them — "All three bigs (Martin, Childress
 & Chiacig) share the floor" — which answers the question on the line itself.
 
+## Category bars: reverted to the growing design (2026-09-10)
+
+Lukas: "the bars are terrible again. I want them like they were before... it's too much up and down
+for me, I have expressed this before which is why the code was like that before!" He is right, and
+the original design was deliberate.
+
+WHAT I GOT WRONG. The bars and the Team Report used different measures and disagreed about which
+category was shortest 55% of the time. That was real — but I fixed the wrong side. The bars were
+never the problem; the report was. Instead of moving the report onto the bars' measure I moved the
+bars onto a centre-anchored one, which is arguably more informative and much worse to watch: a
+part-built roster sits below a finished one in EVERY category, so the bars sat left of centre and
+lurched with every pick. Then I patched that with a per-stage reference — a second change to prop up
+the first — rather than asking whether the first was right.
+
+NOW. One measure, `catRatio` — a category as a share of its own typical level. The bars grow from an
+empty board and only move as their own score moves; the weak-link label and the report's `standing`
+run on the same ratio, so the picture and the words cannot disagree. The report moved, the bars did
+not.
+
+The cost, stated plainly: ranking by score/mean over-weights the categories with the smallest means,
+so playmaking and efficiency take the weak-link slot more often than scoring does. That is a real
+property of this measure and it is the trade I am making, because watching the bars build is the
+point of them.
+
+Guarded now by a test that measures how often a pick-to-pick bar move goes BACKWARDS, so the next
+person to find this "more informative" gets a failure instead of a shipped regression.
+

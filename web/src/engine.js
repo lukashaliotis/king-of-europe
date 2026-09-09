@@ -61,42 +61,22 @@ export const CAT_TYPICAL = { scoring: 3.58, rebounding: 5.25, playmaking: 2.56, 
 // offered coach rather than the optimal one. Referencing near-perfect play instead told an ordinary
 // finished team it was below par at all five things at once, which is both harsh and useless.
 // Re-measure both rows with sim/category_diag.mjs if the draft distribution ever changes.
-// The bars are drawn WHILE YOU DRAFT, so "typical" has to mean typical AT THIS STAGE. Judging a
-// two-man roster against a finished team told the player he was far below par at everything, and an
-// EMPTY board — every score exactly 0 — came out as five long bars, because zero is a long way below
-// a finished five. It read as though you already had a team before you had pressed Spin.
+// DISPLAY MEASURE — used by the category bars, the weakest-link line and the Team Report, and by
+// nothing in the simulation.
 //
-// So the reference is a table, one row per number of picks made. Row 0 is all zeroes, which makes an
-// untouched board read as exactly typical for an untouched board: no bars at all. Rows 1-5 are the
-// bare five as it comes together; row 6 is the FINISHED build (five plus a sixth man plus a coach and
-// the home floor), which is what the result screen and the Team Report are looking at.
+// A category is judged as a RATIO of its own typical level. That keeps the bars GROWING as you draft:
+// an untouched board is 0 and draws nothing, and each pick adds to a bar that only ever moves one way.
+// A centre-anchored version was tried — measuring each category as a distance above or below typical —
+// and it is worse to USE even though it is arguably more informative: a part-built roster is below a
+// finished one in every category, so the bars sat left of centre and lurched about with every pick.
+// Watching them build is the point. Do not make them oscillate.
 //
-// Measured over a realistic mix of play — half casual, half skilled — with sim/category_diag.mjs.
-const STAGE_MEAN = [
-  { scoring: 0, rebounding: 0, playmaking: 0, defense: 0, efficiency: 0 },
-  { scoring: 1.30, rebounding: 1.52, playmaking: 0.79, defense: 1.42, efficiency: 0.39 },
-  { scoring: 2.33, rebounding: 2.42, playmaking: 1.15, defense: 2.23, efficiency: 0.72 },
-  { scoring: 3.31, rebounding: 3.25, playmaking: 1.49, defense: 2.99, efficiency: 1.04 },
-  { scoring: 3.98, rebounding: 4.00, playmaking: 1.73, defense: 3.70, efficiency: 1.34 },
-  { scoring: 3.15, rebounding: 4.54, playmaking: 1.50, defense: 4.18, efficiency: 1.61 },
-  { scoring: 4.32, rebounding: 5.40, playmaking: 2.08, defense: 5.11, efficiency: 2.24 },
-];
-// ONE shared scale per stage, never a per-category one. Dividing each category by its own spread
-// looked like the fair answer and is not: the spreads move with how you draft, so it merely relocates
-// the distortion (a 2.8x weak-link imbalance on skilled play became 38x on scattergun drafts).
-const STAGE_SCALE = [1, 0.81, 1.11, 1.39, 1.60, 1.64, 1.78];
-export const FINAL_STAGE = 6;
-/** The finished-build reference, kept exported for callers that want the numbers directly. */
-export const DISPLAY_MEAN = STAGE_MEAN[FINAL_STAGE];
-export const DISPLAY_SCALE = STAGE_SCALE[FINAL_STAGE];
-/**
- * How a category stands against a typical roster AT THE SAME STAGE, on one shared scale.
- * `stage` is how many of the five are drafted (0-5), or FINAL_STAGE for a finished build.
- */
-export const catZ = (score, k, stage = FINAL_STAGE) => {
-  const i = Math.max(0, Math.min(FINAL_STAGE, stage | 0));
-  return ((score || 0) - STAGE_MEAN[i][k]) / STAGE_SCALE[i];
-};
+// Everything that ranks categories goes through catRatio, so the shortest bar and the category the
+// report names as the weak point are the same category by construction. They once used score/mean and
+// score-mean respectively and disagreed 55% of the time.
+export const catRatio = (score, k) => (score || 0) / (CAT_TYPICAL[k] || 1);
+/** Fractional deviation from typical: 0 = typical, +0.30 = 30% above. Same ordering as catRatio. */
+export const catZ = (score, k) => catRatio(score, k) - 1;
 const GATE_SHIFT = (() => {
   const avg = CATEGORIES.reduce((a, k) => a + CAT_TYPICAL[k], 0) / CATEGORIES.length;
   const s = {};

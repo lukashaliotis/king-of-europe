@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { projectRecord, seedFromRoster, gameProbability, CATEGORIES, GAMES, CAT_TYPICAL, DISPLAY_MEAN, DISPLAY_SCALE, FINAL_STAGE, catZ } from "../web/src/engine.js";
+import { projectRecord, seedFromRoster, gameProbability, CATEGORIES, GAMES, CAT_TYPICAL, catRatio, catZ } from "../web/src/engine.js";
+import { catBarGeom, weakestBarCat } from "../web/src/catbars.js";
 import { coachDeltas } from "../web/src/coaches.js";
 import { data, pools, builds, seasonOf, quantile } from "./helpers.mjs";
 
@@ -56,48 +57,6 @@ test("gameProbability is symmetric and bounded", () => {
   assert.equal(gameProbability(7, 7), 0.5);
 });
 
-test("the display reference is separate from the sim's gate constant", () => {
-  // CAT_TYPICAL feeds GATE_SHIFT and is calibrated on the BARE FIVE; DISPLAY_MEAN is what the bars
-  // and the Team Report are judged against and covers the FINISHED build (five + 6th + coach), which
-  // sits about a category-point higher. Collapsing them back into one number would tell every
-  // completed team it was above par at everything.
-  // They are measured on deliberately different populations — CAT_TYPICAL on a greedy BARE FIVE, and
-  // DISPLAY_MEAN on a realistic MIX of finished builds (half casual). So they must not be equal, but
-  // neither uniformly dominates: playmaking is lower on the display side precisely because half that
-  // sample is a points-chaser who does not pass.
-  let differ = 0;
-  for (const k of CATEGORIES) if (Math.abs(DISPLAY_MEAN[k] - CAT_TYPICAL[k]) > 1e-9) differ++;
-  assert.equal(differ, CATEGORIES.length, "display and sim references have collapsed into one");
-  assert.ok(DISPLAY_SCALE > 0);
-  for (const k of CATEGORIES) assert.equal(catZ(DISPLAY_MEAN[k], k), 0, `${k}: typical must read as z 0`);
-});
-
-test("catZ uses ONE shared scale, so no category is amplified", () => {
-  // Per-category standard deviations were tried and rejected: the spreads move with how you draft,
-  // so own-sd scoring merely relocated the distortion (2.8x on skilled play, 38x on scattergun).
-  const step = CATEGORIES.map((k) => catZ(DISPLAY_MEAN[k] + 1, k));
-  for (const s of step) assert.ok(Math.abs(s - step[0]) < 1e-9, "categories are scaled differently");
-});
-
-test("the weak link is reasonably even across drafting styles", () => {
-  // The whole point of the relative gate is that ANY category can be your weak link. This is the
-  // regression guard on that: score/mean used to hand the two small-mean categories the slot 24x
-  // more often than the least-named one on a points-chasing draft.
-  for (const [mode, limit] of [["skilled", 6], ["casual", 14], ["spread", 16]]) {
-    const share = Object.fromEntries(CATEGORIES.map((k) => [k, 0]));
-    const bs = builds(500, mode, 1006);
-    for (const b of bs) {
-      const cs = seasonOf(b).categoryScores;
-      let worst = null, wv = Infinity;
-      for (const k of CATEGORIES) { const v = catZ(cs[k], k); if (v < wv) { wv = v; worst = k; } }
-      share[worst]++;
-    }
-    const counts = CATEGORIES.map((k) => share[k]);
-    const spread = Math.max(...counts) / Math.max(1, Math.min(...counts));
-    assert.ok(spread <= limit, `${mode}: weak-link spread ${spread.toFixed(1)}x exceeds ${limit}x — ${JSON.stringify(share)}`);
-  }
-});
-
 test("floor spacing is derived, bounded and era-relative", () => {
   const xs = data.players.filter((p) => p.box).map((p) => p.spacing);
   assert.ok(xs.length > 5000, "spacing was not derived onto the players");
@@ -151,31 +110,47 @@ test("stacking bigs is no longer a free optimum", () => {
   assert.ok(corr > -0.13, `spacing still correlates ${corr.toFixed(3)} with wins — the term has stopped biting`);
 });
 
-test("an untouched board draws no bars", () => {
-  // The bars are drawn WHILE you draft, so "typical" has to mean typical at THIS stage. Judged
-  // against a finished team, an empty board — every score exactly 0 — came out as five long bars,
-  // which read as though you already had a team before pressing Spin.
-  for (const k of CATEGORIES) assert.equal(catZ(0, k, 0), 0, `${k}: an empty board is not neutral`);
+test("the bars build as you draft instead of oscillating", () => {
+  // Lukas asked for this twice. A centre-anchored bar is arguably more informative and is much worse
+  // to watch: a part-built roster is below a finished one in every category, so the bars sit left of
+  // centre and lurch about with every pick. The bar is a share of typical, so it grows.
+  let steps = 0, backwards = 0;
+  for (const b of builds(150, "skilled", 1010)) {
+    let prev = CATEGORIES.map(() => 0);
+    for (let n = 1; n <= 5; n++) {
+      const cs = projectRecord(b.five.slice(0, n), data.seasons).categoryScores;
+      const now = CATEGORIES.map((k) => { const g = catBarGeom(cs[k], k); return g.left >= 50 ? g.width : -g.width; });
+      for (let i = 0; i < CATEGORIES.length; i++) { steps++; if (now[i] < prev[i] - 1e-9) backwards++; }
+      prev = now;
+    }
+  }
+  const pct = 100 * backwards / steps;
+  assert.ok(pct < 22, `${pct.toFixed(1)}% of pick-to-pick bar moves go backwards — the bars are oscillating`);
 });
 
-test("a part-built roster is judged against a part-built roster", () => {
-  // Each stage's own reference, so the bars stay meaningful from the first pick rather than telling
-  // every partial roster it is far below par at everything.
-  const five = pools.find((p) => p.players.length >= 5).players.slice(0, 5);
-  for (let n = 1; n <= 5; n++) {
-    const res = projectRecord(five.slice(0, n), data.seasons);
-    for (const k of CATEGORIES) {
-      const z = catZ(res.categoryScores[k], k, n);
-      assert.ok(Number.isFinite(z) && Math.abs(z) < 8, `${n} picks, ${k}: z ${z}`);
-    }
+test("an untouched board draws no bars at all", () => {
+  for (const k of CATEGORIES) {
+    assert.equal(catRatio(0, k), 0, `${k}: an empty board is not zero`);
+    assert.equal(catBarGeom(0, k).width, 0, `${k}: an empty board still draws a bar`);
   }
 });
 
-test("the finished-build reference is the default", () => {
-  // teamReport and the result card call catZ without a stage; they are always looking at a complete
-  // build, so the default must be the finished-build row, not the bare five.
-  for (const k of CATEGORIES) {
-    assert.equal(catZ(DISPLAY_MEAN[k], k), 0, `${k}: default stage is not the finished build`);
-    assert.equal(catZ(DISPLAY_MEAN[k], k, FINAL_STAGE), catZ(DISPLAY_MEAN[k], k));
+test("the shortest bar IS the category the report names", () => {
+  // One measure for the geometry and the label, so the picture and the words can never disagree.
+  for (const b of builds(300, "spread", 1011)) {
+    const cs = seasonOf(b).categoryScores;
+    let worst = null, wv = Infinity;
+    for (const k of CATEGORIES) { const g = catBarGeom(cs[k], k); const signed = g.left >= 50 ? g.width : -g.width;
+      if (signed < wv) { wv = signed; worst = k; } }
+    assert.equal(weakestBarCat(cs), worst, "the highlighted category is not the shortest bar");
+  }
+});
+
+test("catZ orders categories exactly as the bars do", () => {
+  for (const b of builds(200, "spread", 1012)) {
+    const cs = seasonOf(b).categoryScores;
+    const byZ = [...CATEGORIES].sort((a, c) => catZ(cs[a], a) - catZ(cs[c], c));
+    const byRatio = [...CATEGORIES].sort((a, c) => catRatio(cs[a], a) - catRatio(cs[c], c));
+    assert.deepEqual(byZ, byRatio, "the report and the bars would rank categories differently");
   }
 });

@@ -148,11 +148,10 @@ export function teamReport(res, five, opts, data) {
   const seed = hashCodes(five);
   const pick = (arr) => arr[seed % arr.length];
 
-  // STANDING IS THE BAR, in the bar's own units. The category bars are drawn in engine.catZ — each
-  // category measured against a typical FINISHED build, in that category's own spread — so the report
-  // judges in exactly the same measure and the two can never rank things differently. (Before, the
-  // bars used score/mean and the report used score-mean, which disagreed 55% of the time; and both
-  // over-weighted whichever categories have the smallest means.)
+  // STANDING IS THE BAR. The bars are drawn as a share of each category's typical level, and `catZ`
+  // is that same ratio expressed as a deviation (0 = typical), so the report ranks categories exactly
+  // as the picture above it does and the two can never disagree. They once used score/mean and
+  // score-mean respectively and disagreed 55% of the time.
   const standing = {};
   for (const k of CATEGORIES) standing[k] = catZ(res.categoryScores[k], k);
   // The headline weakness = the SMALLEST BAR (lowest score-to-typical ratio), so this popup names the
@@ -164,7 +163,7 @@ export function teamReport(res, five, opts, data) {
   // A category becomes a STRENGTH only if it's clearly ELITE (well above a typical team) AND a real
   // signal backs it, so the same praise never fires on a merely-decent category. A WEAKNESS surfaces
   // if the category is clearly below par OR it's the gate; its text is a SPECIFIC diagnosis.
-  const ELITE = 0.55, WEAK = -0.25; // engine.catZ units: shared-scale distance from a typical build
+  const ELITE = 0.30, WEAK = -0.10; // fractional deviation from typical, the bar's own measure
   const strengths = [];
   const wcand = {}; // cat -> its specific diagnosis text; the actual selection happens after the caps.
   const S = (cat, elite, text) => { if (text && elite && standing[cat] > ELITE && !strengths.some((f) => f.cat === cat)) strengths.push({ cat, text }); };
@@ -307,7 +306,7 @@ export function teamReport(res, five, opts, data) {
   // with itself. From what's left, the gate (relative weak point) leads, then the next categories that
   // are actually below a typical team, up to the cap. A side that's at/above typical everywhere is
   // allowed to show NO weakness rather than manufacturing one from a category it's merely least-elite in.
-  const SOFT = -0.05;
+  const SOFT = -0.02;
   const strengthCats = new Set(strengths.map((s) => s.cat));
   const weaknesses = CATEGORIES.filter((c) => wcand[c] && !strengthCats.has(c)).map((c) => ({ cat: c, text: wcand[c] }));
   weaknesses.sort((a, b) => (a.cat === gate ? -1 : b.cat === gate ? 1 : standing[a.cat] - standing[b.cat]));
