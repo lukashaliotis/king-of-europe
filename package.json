@@ -1,0 +1,13 @@
+{
+  "name": "king-of-europe",
+  "private": true,
+  "type": "module",
+  "description": "38-0 / King of Europe. Static game, no build step — this file exists only to hang the test runner off.",
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "check": "node pipeline/check_data.mjs && node sim/archetype_check.mjs && node --test \"test/*.test.mjs\"",
+    "balance": "node sim/mode_balance.mjs 1200",
+    "report-audit": "node sim/report_audit.mjs 4000",
+    "deploy": "wrangler pages deploy . --project-name king-of-europe --branch main --commit-dirty=true"
+  }
+}
