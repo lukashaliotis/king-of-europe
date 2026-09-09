@@ -265,6 +265,8 @@ export function teamReport(res, five, opts, data) {
   if (stretchBig && standing.efficiency > ELITE) S("efficiency", true, `${surname(stretchBig.playerName)} stretches the floor as a shooting big.`);
   else if (shooterWing && standing.efficiency > ELITE) S("efficiency", true, `${surname(shooterWing.playerName)} spaces the floor with reliable outside shooting.`);
   else S("efficiency", true, "Efficient shot selection, generating high-value looks.");
+  // the highest-usage man in the five — team TS% is usage-weighted, so he moves it most
+  const hog = [...five].sort((a, b) => (b.mpg > 0 ? b.box.fga / b.mpg : 0) - (a.mpg > 0 ? a.box.fga / a.mpg : 0))[0];
   const ftShooters = five.filter((p) => p.box.fta >= 1);
   const teamFtZ = avgZ(ftShooters, "ft", data);
   W("efficiency",
@@ -274,6 +276,12 @@ export function teamReport(res, five, opts, data) {
     : (bigsTwoZ < -0.35 && bigs.length) ? "The bigs finish poorly inside, converting too few looks at the rim."
     : (ftShooters.length >= 3 && teamFtZ < -0.3) ? "Poor free-throw shooting hands back the points this five earns."
     : !rosterHas(five, "spacing", data) ? "Nobody stretches the defense, so every shot comes contested."
+    // Efficiency had no WEAK-LINK branch at all, so a team whose worst category was efficiency got a
+    // shrug ("too many contested shots") while every other category could name the man responsible.
+    // Team TS% is a usage-weighted mean, so the man who drags it is the one taking a lot of shots and
+    // missing them — that is a name, not a mystery.
+    : (hog && z(hog, "cat_efficiency", data) < -0.4)
+      ? `${surname(hog.playerName)} takes a big share of the shots and converts too few of them.`
     : "Too many contested, low-value shots.");
 
   // ---------- FACTORS (merged into strengths, but ONLY when genuinely EXCEPTIONAL) ----------
@@ -475,8 +483,11 @@ export function teamReport(res, five, opts, data) {
     // one hole is playmaking, a creator arriving off the bench is the most interesting fact in the
     // report even if a starter nominally supplies creation too. A category the report has just called
     // a weakness counts as a gap.
-    const covers = sa ? ["spacing", "rim", "glass", "creator", "stopper"]
-      .find((c) => sa.caps[c] && (!rosterHas(five, c, data) || weakCats.has(CAP_CAT[c]))) : null;
+    // Only a gap his ARCHETYPE can credibly fill. Walking the caps in a fixed order and taking the
+    // first the five happens to need described Doncic — a volume scorer — as a perimeter defender,
+    // because his steals cleared the bar and defense was the listed weakness.
+    const covers = (sa && sa.supplies && sa.caps[sa.supplies]
+      && (!rosterHas(five, sa.supplies, data) || weakCats.has(CAP_CAT[sa.supplies]))) ? sa.supplies : null;
     // The engine already discounts a ball-dominant reserve (benchValue); the player was never told.
     const lost = sa ? Math.round(100 * Math.max(0, (sa.traits.usage - 0.20) / 0.20) * 0.27 / 0.92) : 0;
     if (covers) {

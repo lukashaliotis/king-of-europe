@@ -147,3 +147,26 @@ test("filler lines stay rare", () => {
   const pct = 100 * generic / total;
   assert.ok(pct < 10, `${pct.toFixed(1)}% of lines are generic filler (was 31.6% before the rewrite)`);
 });
+
+test("a claim about a player's role agrees with his archetype", () => {
+  // The report told a team that Luka Doncic was "the only perimeter defender on the roster". His
+  // steals as an 18-year-old cleared the stopper bar and defense was the listed weakness, so a fixed
+  // walk through the capabilities picked it — about a volume scorer. What a player's numbers DO and
+  // what he can be CALLED are different questions.
+  for (const { b, rp } of reports) {
+    const claim = [...rp.strengths, ...rp.weaknesses].map((x) => x.text)
+      .find((t) => /only .+ on the roster|comes from .+, off the bench/.test(t));
+    if (!claim || !b.sixth) continue;
+    const sa = archetypeOf(b.sixth, data);
+    assert.ok(sa && sa.supplies, `claims a role for a ${sa && sa.key}, which supplies nothing: ${claim}`);
+    assert.ok(sa.caps[sa.supplies], `claims a role his own numbers do not support: ${claim}`);
+  }
+});
+
+test("a volume scorer is never described as a defender", () => {
+  const luka = data.players.find((p) => p.season === 2017 && /DONČIĆ/.test(p.playerName));
+  assert.ok(luka, "Doncic 2017 is no longer in the dataset");
+  const a = archetypeOf(luka, data);
+  assert.equal(a.key, "volume_scorer");
+  assert.ok(!a.supplies, "a volume scorer should not be claimable as anything else");
+});

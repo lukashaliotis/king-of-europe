@@ -163,28 +163,34 @@ export function traitsOf(p, data) {
 // Ordered by priority WITHIN each position group — the first bar a player clears wins, so the more
 // specific, more identity-defining archetypes are tested before the general ones.
 // ---------------------------------------------------------------------------------------------
+// `supplies` is the one capability this archetype can be CREDIBLY described as providing. The caps
+// object says what a player's numbers do; `supplies` says what he can be CALLED. They differ because
+// steals are a gambling stat as much as a defensive one: Luka Doncic's 1.2 a game as an 18-year-old
+// clear the stopper bar, and the report duly told a team he was "the only perimeter defender on the
+// roster" — about a volume scorer. A claim about a player's ROLE now has to agree with the module
+// that exists to say what his role is.
 export const ARCHETYPE = {
   // --- bigs -------------------------------------------------------------------------------
-  stretch_big:   { label: "Stretch big",      need: "a stretch big",            group: "big" },
-  rim_protector: { label: "Rim protector",    need: "a rim-protecting big",     group: "big" },
-  glass_cleaner: { label: "Glass cleaner",    need: "a rebounding big",         group: "big" },
+  stretch_big:   { label: "Stretch big",      need: "a stretch big",            group: "big" , supplies: "spacing" },
+  rim_protector: { label: "Rim protector",    need: "a rim-protecting big",     group: "big" , supplies: "rim" },
+  glass_cleaner: { label: "Glass cleaner",    need: "a rebounding big",         group: "big" , supplies: "glass" },
   post_scorer:   { label: "Post scorer",      need: "an interior scorer",       group: "big" },
-  playmaking_big:{ label: "Playmaking big",   need: "a playmaking big",         group: "big" },
+  playmaking_big:{ label: "Playmaking big",   need: "a playmaking big",         group: "big" , supplies: "creator" },
   rim_runner:    { label: "Rim runner",       need: "a finisher at the rim",    group: "big" },
   energy_big:    { label: "Energy big",       need: "a big",                    group: "big" },
   // --- wings ------------------------------------------------------------------------------
-  three_and_d:   { label: "3&D wing",         need: "a 3&D wing",               group: "wing" },
-  sharpshooter:  { label: "Sharpshooter",     need: "an outside shooter",       group: "wing" },
+  three_and_d:   { label: "3&D wing",         need: "a 3&D wing",               group: "wing" , supplies: "stopper" },
+  sharpshooter:  { label: "Sharpshooter",     need: "an outside shooter",       group: "wing" , supplies: "spacing" },
   slasher:       { label: "Slashing wing",    need: "a slasher who draws fouls",group: "wing" },
-  point_forward: { label: "Point forward",    need: "a playmaking forward",     group: "wing" },
+  point_forward: { label: "Point forward",    need: "a playmaking forward",     group: "wing" , supplies: "creator" },
   scoring_wing:  { label: "Scoring wing",     need: "a wing who can score",     group: "wing" },
   glue_wing:     { label: "Glue wing",        need: "a wing",                   group: "wing" },
   // --- guards -----------------------------------------------------------------------------
-  floor_general: { label: "Floor general",    need: "a pass-first floor general", group: "guard" },
-  sniper:        { label: "Sniper",           need: "an outside shooter",       group: "guard" },
+  floor_general: { label: "Floor general",    need: "a pass-first floor general", group: "guard" , supplies: "creator" },
+  sniper:        { label: "Sniper",           need: "an outside shooter",       group: "guard" , supplies: "spacing" },
   combo_guard:   { label: "Combo guard",      need: "a scoring guard",          group: "guard" },
   slashing_guard:{ label: "Slashing guard",   need: "a guard who gets downhill",group: "guard" },
-  on_ball_pest:  { label: "On-ball pest",     need: "a point-of-attack defender", group: "guard" },
+  on_ball_pest:  { label: "On-ball pest",     need: "a point-of-attack defender", group: "guard" , supplies: "stopper" },
   volume_scorer: { label: "Volume scorer",    need: "a shot-creator",           group: "guard" },
   role_guard:    { label: "Role guard",       need: "a guard",                  group: "guard" },
 };

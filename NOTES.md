@@ -159,3 +159,25 @@ point of them.
 Guarded now by a test that measures how often a pick-to-pick bar move goes BACKWARDS, so the next
 person to find this "more informative" gets a failure instead of a shipped regression.
 
+## "Doncic is the only perimeter defender" (2026-09-10)
+
+A report listed **Luka Doncic** — coming off the bench — as the five's only perimeter defender. His
+1.2 steals a game as an 18-year-old at Real Madrid clear the stopper bar, defense was the listed
+weakness, and the bench line walked the capabilities in a fixed order and took the first one the five
+happened to need. So a volume scorer was described as a stopper.
+
+The root of it: steals are a gambling stat as much as a defensive one, the same blind spot that makes
+`defense = steals + blocks` unable to see team defense. What a player's numbers DO and what he can be
+CALLED are different questions, and only the first was being asked.
+
+Each archetype now declares `supplies` — the one capability it can credibly be described as
+providing — and a role claim has to agree with it. `volume_scorer` supplies nothing, so Doncic falls
+through to the ordinary bench lines and is praised for elite scoring instead. 0 mismatched claims
+across 2,500 reports.
+
+Also added the weak link efficiency never had. Every other category could name the man responsible;
+efficiency shrugged ("too many contested, low-value shots"). Team TS% is usage-weighted, so the man
+who drags it is the one taking a big share of the shots and missing them. Where there is no such man
+the shrug STAYS — checked, and in those reports the top-usage player shoots 58% TS, so there is
+genuinely nobody to name. Generic lines overall: 5.2% -> 4.1%.
+
