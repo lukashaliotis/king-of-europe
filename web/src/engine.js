@@ -24,6 +24,12 @@ const RATE_CATEGORIES = new Set(["efficiency"]);
 // their raw z-scores add as if they could. These get damped by the usage-collision term.
 const COLLISION_CATEGORIES = ["scoring", "playmaking"];
 
+// Categories a CROWDED PAINT actually costs you. If nobody on the floor has to be guarded outside,
+// the defense sits in the lane: drives die, shots get contested, and the five's shot quality falls.
+// Not rebounding or defense — a lineup of bigs really does board and block, and their own numbers
+// already say so.
+const SPACING_CATEGORIES = ["scoring", "efficiency"];
+
 // RELATIVE GATE. The weakest-link gate used to be the lowest RAW category sum, which is biased:
 // rebounding & defense stack freely (typically high) while playmaking & efficiency are structurally
 // low, so the gate landed on those two ~83% of the time. We instead judge each category against its
@@ -97,6 +103,29 @@ export const DEFAULT_PARAMS = {
   // It punishes the thing we WANT punished (stacking ball-hogs) instead of punishing everyone.
   usageBudget: 1.55,
   collisionK: 3.2,
+  // FLOOR SPACING. The sim had no idea whether a five could stretch a defense, and the omission had a
+  // direction: interior players post the rebounds and blocks the engine rewards, so stacking bigs was
+  // a mild OPTIMUM. Measured over realistic drafts, team spacing correlated -0.14 with S and -0.11
+  // with wins — the worst-spaced tenth of teams won MORE than the best-spaced tenth (median 5 against
+  // 4, with 2.5 bigs against 1.7). Meanwhile the Team Report was telling those same players their
+  // paint was too crowded. The model and the write-up disagreed, and the model was the wrong one.
+  //
+  // Same shape as the usage collision above, and for the same reason: each player's own shooting is
+  // already in his numbers, but nothing expressed that five non-shooters make EACH OTHER worse. It
+  // damps upside only — a packed lane cannot make you better at something you were bad at — and it
+  // needs `spacing` from data.js deriveSpacing, defaulting to neutral when absent so a bare-roster
+  // call (tests, sim harnesses) behaves exactly as before.
+  //
+  // spacingSlack is the room below a typical five before it bites; spacingK is how hard it bites.
+  // Tuned against a drafter that OPTIMISES UNDER THIS TERM, which is the only measurement that means
+  // anything here — the point is to change what a good player BUILDS, not merely to tax what he built
+  // before. At 0.10 / 0.9 the optimiser's average five goes from -0.28 spacing to -0.15 and from 2.27
+  // bigs to 2.16, for one median win and no change to the 38-0 rate. Pushing harder keeps flattening
+  // the spacing-to-wins correlation but starts eating the win curve (K 1.6 costs four median wins),
+  // and the correlation should not reach zero anyway: a lineup of bigs genuinely does rebound.
+  spacingSlack: 0.10,
+  spacingK: 0.9,
+
   // PER-GAME win curve. `leagueS` is the effective strength of a league-average opponent — the
   // S at which you win exactly half your games — and gameSteep is how sharply an edge in S turns
   // into an edge in a single game:
@@ -314,6 +343,19 @@ export function projectRecord(roster, seasons, params = DEFAULT_PARAMS, arenaMul
   const collision = 1 / (1 + p.collisionK * excess);
   for (const k of COLLISION_CATEGORIES) {
     if (categoryScores[k] > 0) categoryScores[k] *= collision;
+  }
+
+  // 2b) floor spacing — a five nobody has to guard outside gets its shot quality squeezed
+  let spacingZ = 0, spacingSeen = 0;
+  for (const pl of roster) {
+    if (!pl || typeof pl.spacing !== "number") continue;
+    spacingZ += pl.spacing; spacingSeen++;
+  }
+  spacingZ = spacingSeen ? spacingZ / spacingSeen : 0;
+  const crowd = Math.max(0, -spacingZ - p.spacingSlack);
+  const spacingMult = 1 / (1 + p.spacingK * crowd);
+  for (const k of SPACING_CATEGORIES) {
+    if (categoryScores[k] > 0) categoryScores[k] *= spacingMult;
   }
 
   // 3) coach patches the gate; 4) the 6th man adds what he's good at (usage-discounted) but

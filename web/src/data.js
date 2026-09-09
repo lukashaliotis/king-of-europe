@@ -110,6 +110,43 @@ export function deriveRoles(data) {
   return data;
 }
 
+// FLOOR SPACING, per player-season: how much of his own shot diet comes from outside, judged against
+// same-season, same-position peers. Era- and position-relative like everything else here, because the
+// league's shot diet has moved further in 25 years than any other thing in this data — the median
+// qualified guard now takes 48% of his shots from three, and a fixed bar would simply mark every
+// pre-2010 roster down.
+//
+// The engine reads this to damp a five whose floor nobody stretches (see SPACING_CATEGORIES there).
+// It is a LOAD-TIME artefact like interior/pos5 — never persist it (pipeline/check_data.mjs enforces).
+export function deriveSpacing(data) {
+  const groups = new Map(); // "season|pos" -> [outside share]
+  const shareOf = (p) => { const t = p.box.tpa + p.box.twa; return t > 0 ? p.box.tpa / t : 0; };
+  for (const p of data.players) {
+    if (!p.q || !p.box || (p.gp || 0) < 10) continue; // the league's real diet, not cameos
+    const k = `${p.season}|${p.pos}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(shareOf(p));
+  }
+  const base = new Map();
+  for (const [k, xs] of groups) {
+    const m = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const sd = Math.sqrt(xs.reduce((a, b) => a + (b - m) * (b - m), 0) / xs.length) || 0.1;
+    base.set(k, { m, sd });
+  }
+  // Shrunk by games played and clamped, the same discipline the engine applies to every other z here.
+  // Without it a 7-game centre who took two threes a night in 2009 — a season when centres essentially
+  // never shot them, so the group's spread is almost nothing — came back at z 8.6 and would have
+  // dragged a whole five's spacing on his own. 54 rows cleared |z| > 3 before this; the real p99 is 2.9.
+  for (const p of data.players) {
+    const b = base.get(`${p.season}|${p.pos}`);
+    if (!b || !p.box) { p.spacing = 0; continue; }
+    const raw = (shareOf(p) - b.m) / b.sd;
+    const shrink = p.gp ? p.gp / (p.gp + 4) : 0;
+    p.spacing = Math.max(-3, Math.min(3, raw * shrink));
+  }
+  return data;
+}
+
 export async function loadData() {
   // Resolve relative to THIS module (web/src/data.js), not the page, so it works whether the
   // app is served from the repo root (production static deploy) or the dev server.
@@ -124,6 +161,7 @@ export async function loadData() {
 export function buildClubSeasons(data) {
   applyCareerPositions(data); // collapse tweeners to one career position before pooling
   deriveRoles(data);          // refine into PG/SG/SF/PF/C + interior flag for display + the Team Report
+  deriveSpacing(data);        // per-player floor spacing, read by the engine's spacing term
   const byId = new Map();
   for (const pl of data.players) {
     if (!pl.teamCode || pl.teamCode.includes(";")) continue;

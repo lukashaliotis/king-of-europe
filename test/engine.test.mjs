@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { projectRecord, seedFromRoster, gameProbability, CATEGORIES, GAMES, CAT_TYPICAL, DISPLAY_MEAN, DISPLAY_SCALE, catZ } from "../web/src/engine.js";
+import { coachDeltas } from "../web/src/coaches.js";
 import { data, builds, seasonOf, quantile } from "./helpers.mjs";
 
 test("a projection is always finite and in range", () => {
@@ -95,4 +96,57 @@ test("the weak link is reasonably even across drafting styles", () => {
     const spread = Math.max(...counts) / Math.max(1, Math.min(...counts));
     assert.ok(spread <= limit, `${mode}: weak-link spread ${spread.toFixed(1)}x exceeds ${limit}x — ${JSON.stringify(share)}`);
   }
+});
+
+test("floor spacing is derived, bounded and era-relative", () => {
+  const xs = data.players.filter((p) => p.box).map((p) => p.spacing);
+  assert.ok(xs.length > 5000, "spacing was not derived onto the players");
+  for (const z of xs) assert.ok(Number.isFinite(z) && Math.abs(z) < 8, `implausible spacing z: ${z}`);
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  assert.ok(Math.abs(mean) < 0.35, `spacing should centre near 0 across the league, got ${mean.toFixed(2)}`);
+  // era-relative: a pre-2010 roster must not be marked down simply for its decade's shot diet
+  const era = (lo, hi) => { const s = data.players.filter((p) => p.box && p.season >= lo && p.season <= hi).map((p) => p.spacing);
+    return s.reduce((a, b) => a + b, 0) / s.length; };
+  assert.ok(Math.abs(era(2001, 2009) - era(2016, 2025)) < 0.3, "spacing drifts by era — the baseline is not era-relative");
+});
+
+test("the spacing term only ever damps, and only what a packed paint costs", () => {
+  // Same guarantee the usage collision gives: crowding cannot make you BETTER at anything, and it
+  // must not touch rebounding or defense — a lineup of bigs really does board and block.
+  for (const b of builds(200, "spread", 1007)) {
+    const on = seasonOf(b);
+    const off = projectRecord(b.five, data.seasons, { spacingK: 0 }, b.mult,
+      b.coach ? coachDeltas(b.coach) : null, b.sixth);
+    for (const k of CATEGORIES) {
+      assert.ok(on.categoryScores[k] <= off.categoryScores[k] + 1e-9, `${k} was RAISED by the spacing term`);
+    }
+    for (const k of ["rebounding", "defense", "playmaking"]) {
+      assert.ok(Math.abs(on.categoryScores[k] - off.categoryScores[k]) < 1e-9, `${k} should be untouched by spacing`);
+    }
+  }
+});
+
+test("a roster with no spacing data behaves exactly as before", () => {
+  // sim harnesses and tests call projectRecord on raw player rows that never went through
+  // data.js deriveSpacing; those must not be silently penalised.
+  for (const b of builds(60, "skilled", 1008)) {
+    const bare = b.five.map(({ spacing, ...rest }) => rest);
+    const a = projectRecord(bare, data.seasons);
+    const c = projectRecord(bare, data.seasons, { spacingK: 0 });
+    assert.equal(a.S, c.S, "a roster without spacing data was penalised anyway");
+  }
+});
+
+test("stacking bigs is no longer a free optimum", () => {
+  // Before the term, team spacing correlated -0.14 with S and -0.11 with wins: interior players post
+  // the rebounds and blocks the engine rewards, so the sim PAID you for the crowded paint the Team
+  // Report was warning you about. It should not reach zero — a lineup of bigs genuinely does rebound.
+  const rows = builds(500, "spread", 1009).map((b) => ({
+    sp: b.five.reduce((a, p) => a + (p.spacing || 0), 0) / 5, wins: seasonOf(b).wins }));
+  const n = rows.length;
+  const ms = rows.reduce((a, r) => a + r.sp, 0) / n, mw = rows.reduce((a, r) => a + r.wins, 0) / n;
+  let nu = 0, ds = 0, dw = 0;
+  for (const r of rows) { const x = r.sp - ms, y = r.wins - mw; nu += x * y; ds += x * x; dw += y * y; }
+  const corr = nu / Math.sqrt(ds * dw);
+  assert.ok(corr > -0.13, `spacing still correlates ${corr.toFixed(3)} with wins — the term has stopped biting`);
 });

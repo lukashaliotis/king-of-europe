@@ -39,6 +39,10 @@ already been considered and rejected for reasons documented there.
   that mutated object back to the file, or a re-bake silently changes the data's shape.
   Run `node pipeline/check_data.mjs` to verify. Name/position corrections belong in the
   pipeline's `*_NAME_FIXES` maps or `data.js`'s `POS_FIX`, never hand-edited into the JSON.
+- **Floor spacing** is a load-time derived field (`data.js deriveSpacing`), era- and position-relative,
+  gp-shrunk and clamped like every other z here — never persist it. The engine reads it to damp
+  `SPACING_CATEGORIES` only, and only downward. Before it existed the sim quietly REWARDED stacking
+  bigs (spacing correlated -0.14 with S) while the Team Report warned about the crowded paint.
 - Player **archetypes** (`web/src/archetypes.js`) are season-specific and era-relative: shot diet is
   a PERCENTILE within the player's own season and position group, never an absolute bar. A fixed bar
   is what made the report tell a team holding Pleiss to sign a stretch big. Any change to the rules

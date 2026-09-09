@@ -68,3 +68,30 @@ Two things worth remembering for the next pass:
 - **This repo is not under version control.** A refactor of this size was done against a manual copy in
   `.refactor-backup/`, which is not a substitute. `git init` before the next one.
 
+## Floor spacing in the engine (2026-09-09)
+
+The Team Report had learned to name a crowded paint, but the sim did not care — and the omission had
+a DIRECTION. Interior players post the rebounds and blocks the engine rewards, so stacking bigs was a
+mild optimum: measured over realistic drafts, team spacing correlated -0.14 with S and -0.11 with
+wins, and the worst-spaced tenth of teams won MORE than the best-spaced tenth (median 5 against 4,
+2.5 bigs against 1.7). The model and the write-up disagreed and the model was the wrong one.
+
+`data.js deriveSpacing` now attaches a per-player floor-spacing z — share of his own shots taken from
+outside, judged against same-season same-position peers, gp-shrunk and clamped to ±3. Era-relative
+because the league's shot diet has moved further in 25 years than anything else in this data.
+
+The engine damps `SPACING_CATEGORIES` (scoring, efficiency) when the five's average spacing sits
+below `spacingSlack`. Same shape and same reasoning as the usage collision: each player's own
+shooting is already in his numbers, but nothing expressed that five non-shooters make EACH OTHER
+worse. Upside only, and deliberately NOT rebounding or defense — a lineup of bigs really does board.
+
+Tuned against a drafter that optimises UNDER the term, which is the only measurement that means
+anything: the point is to change what a good player BUILDS, not to tax what he built before. At
+0.10 / 0.9 the optimiser's average five goes from -0.28 spacing to -0.15 and 2.27 bigs to 2.16.
+Classic skilled: median 30 -> 29, 38-0 2.2% -> 1.7%. A perfect season now also requires spacing the
+floor, which is the intended consequence.
+
+Caught while testing: the first derivation had no reliability shrinkage, so a 7-game centre who took
+two threes a night in 2009 came back at z 8.6 and could drag a whole five on his own. 54 rows cleared
+|z| > 3; none do now.
+

@@ -1,7 +1,7 @@
 // Shape guard for data/players.json — run before committing or deploying.
 //
 // The baked file must contain ONLY what pipeline/build_dataset.py writes. web/src/data.js derives
-// posRaw / bigness / interior / pos5 and collapses `pos` to a career position AT LOAD TIME, mutating
+// posRaw / bigness / interior / pos5 / spacing and collapses `pos` to a career position AT LOAD TIME, mutating
 // the in-memory object. Persisting that mutated object back to disk (which had happened) silently
 // changes the file's shape and meaning, so a later `python3 pipeline/build_dataset.py` produces a
 // DIFFERENT file: raw per-season `pos`, and none of the derived fields. This check fails loudly on that.
@@ -13,7 +13,7 @@ const CANONICAL = new Set([
   "season", "playerCode", "playerName", "teamCode", "teamName",
   "gp", "gs", "mpg", "cat", "box", "pir", "pos", "height", "q",
 ]);
-const DERIVED = ["posRaw", "bigness", "interior", "pos5"]; // added at load; must never be persisted
+const DERIVED = ["posRaw", "bigness", "interior", "pos5", "spacing"]; // added at load; must never be persisted
 
 const d = JSON.parse(fs.readFileSync(new URL("../data/players.json", import.meta.url), "utf8"));
 const seen = new Set();
