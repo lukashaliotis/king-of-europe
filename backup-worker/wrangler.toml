@@ -1,0 +1,19 @@
+name = "king-of-europe-backup"
+main = "index.ts"
+compatibility_date = "2024-11-01"
+
+# Weekly, Mondays 03:00 UTC — same slot as the other crates' backups.
+[triggers]
+crons = ["0 3 * * 1"]
+
+# The SAME D1 the game's leaderboard Functions write to; read-only from here.
+[[d1_databases]]
+binding = "DB"
+database_name = "koe-leaderboard"
+database_id = "91d0013a-fa20-4061-9f1b-e5377a03d318"
+
+# Snapshots land here. KV, not R2 — R2 asks for a payment method even on free tier.
+# This namespace belongs to King of Europe alone; never point another project at it.
+[[kv_namespaces]]
+binding = "BACKUPS_KV"
+id = "517cc9583ecb43cfa8a7a5d83ac275c7"
