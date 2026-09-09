@@ -31,7 +31,35 @@ const COLLISION_CATEGORIES = ["scoring", "playmaking"];
 // naturally-low categories and lowering the naturally-high ones before taking the min — so ANY
 // category can be your weak link. Strength (the sum) is untouched, so this only changes WHICH
 // category caps you, not your raw power.
-export const CAT_TYPICAL = { scoring: 3.23, rebounding: 4.58, playmaking: 2.16, defense: 4.44, efficiency: 1.85 };
+// (Means re-measured 2026-09 with sim/category_diag.mjs; the previous values had drifted 5-16% low,
+// which drew every bar ~10% fuller than the truth.)
+export const CAT_TYPICAL = { scoring: 3.58, rebounding: 5.25, playmaking: 2.56, defense: 5.10, efficiency: 1.96 };
+// ---------------------------------------------------------------------------------------------
+// DISPLAY REFERENCE — used by the category bars, the weakest-link line and the Team Report, and by
+// nothing in the simulation. Deliberately separate from CAT_TYPICAL above, which feeds GATE_SHIFT
+// and is calibrated on the BARE FIVE; what the player is actually shown is the FINISHED build, five
+// plus a sixth man plus a coach, which sits a whole category-point higher. Judging the display
+// against the bare-five bar told a completed team it was above par at everything.
+//
+// The old measure was score/mean, which divides by a number that differs 2.7x across the categories
+// and so amplified whichever ones have the smallest means (playmaking, efficiency). Measured over a
+// points-chasing draft it named those two as the weak link 24x more often than the least-named one.
+//
+// Judging each category in its OWN standard deviation looked like the answer and is NOT: the spreads
+// themselves move with how you draft, so it merely swaps which population gets distorted (spread of
+// 2.8x on skilled play but 38x on scattergun drafts). What is stable is subtracting the mean and
+// scaling everything by ONE shared number — 0 means typical, and no category is amplified relative to
+// another. Worst-case spread across casual / skilled / scattergun / intact-club populations:
+//   score/mean 24.5x   own-sd z 38.4x   shared scale 11.2x  <- least bad on every realistic population
+// Measured over a REALISTIC MIX of play — half casual (chasing points), half skilled, each taking an
+// offered coach rather than the optimal one. Referencing near-perfect play instead told an ordinary
+// finished team it was below par at all five things at once, which is both harsh and useless.
+// Re-measure both rows with sim/category_diag.mjs if the draft distribution ever changes.
+export const DISPLAY_MEAN = { scoring: 4.32, rebounding: 5.40, playmaking: 2.08, defense: 5.11, efficiency: 2.24 };
+/** One shared scale (the mean of the per-category spreads) so nothing is amplified. */
+export const DISPLAY_SCALE = 1.78;
+/** How a category stands against a typical FINISHED build, in spread units. 0 = typical. */
+export const catZ = (score, k) => ((score || 0) - DISPLAY_MEAN[k]) / DISPLAY_SCALE;
 const GATE_SHIFT = (() => {
   const avg = CATEGORIES.reduce((a, k) => a + CAT_TYPICAL[k], 0) / CATEGORIES.length;
   const s = {};
@@ -100,6 +128,16 @@ export const DEFAULT_PARAMS = {
 };
 
 const HOME_GAMES = GAMES / 2; // 19 home, 19 away — the arena is a HOME edge, not a global one
+
+// SALARY captain. He is free and doubles nothing else in the game, so his weight IS the mode's
+// difficulty dial. At the original 2.0 — a straight doubling of one man's contribution across all
+// five categories, and therefore across the gate too — Salary produced a 38-0 in 13.1% of skilled
+// builds against Classic's 1.9%: seven times easier, on a mode with its own leaderboard. Measured:
+// 2.0 -> 13.1%, 1.7 -> 7.5%, 1.5 -> 4.5%, 1.4 -> 3.9%, 1.3 -> 3.4% (Classic 1.9%). 1.4 keeps the
+// captain a decision worth making while leaving Salary about twice as forgiving as Classic rather
+// than seven times. Only ever non-1 in Salary (captainCode is null everywhere else), so nothing
+// outside that mode moves. Re-tune in sim/salary_sim.mjs.
+const CAPTAIN_WEIGHT = 1.4;
 
 function logistic(x, steep, mid) {
   return 1 / (1 + Math.exp(-steep * (x - mid)));
@@ -231,10 +269,12 @@ export function playerStrength(player, seasons, params = DEFAULT_PARAMS) {
  *   the category scores, but USAGE-DISCOUNTED: a high-usage star gives ~65% of his value off
  *   the bench, a low-usage motor player ~90%. This is the deliberate inversion — a role player
  *   is genuinely a better 6th man than a ball-dominant star.
+ * @param {string|null} captainCode - Salary mode: the playerCode whose category contribution counts
+ *   double. Optional; null means no captain.
  * @returns {{wins:number, losses:number, categoryScores:Object, gate:number,
  *            gateCategory:string, strength:number, S:number, benchValue:number}}
  */
-export function projectRecord(roster, seasons, params = DEFAULT_PARAMS, arenaMult = 1, catDeltas = null, sixthMan = null) {
+export function projectRecord(roster, seasons, params = DEFAULT_PARAMS, arenaMult = 1, catDeltas = null, sixthMan = null, captainCode = null) {
   const p = { ...DEFAULT_PARAMS, ...params };
   const bench = sixthMan ? benchValue(sixthMan) : 0;
   const n = roster.length || 1;
@@ -242,6 +282,9 @@ export function projectRecord(roster, seasons, params = DEFAULT_PARAMS, arenaMul
   // Usage shares drive both the rate-category weighting and the collision term below.
   const usages = roster.map(playerUsage);
   const totalUsage = usages.reduce((a, b) => a + b, 0);
+  // Captain (Salary mode): his category contribution counts DOUBLE — he's the man the team runs
+  // through. Weight 2 for the captain, 1 for everyone else; null captain leaves everything at 1.
+  const capW = roster.map((pl) => (captainCode && pl.playerCode === captainCode ? CAPTAIN_WEIGHT : 1));
 
   // 1) the five's own score per category
   const categoryScores = {};
@@ -250,15 +293,17 @@ export function projectRecord(roster, seasons, params = DEFAULT_PARAMS, arenaMul
     if (RATE_CATEGORIES.has(k)) {
       // usage-weighted MEAN, rescaled by n so it stays on the same scale as the counting sums.
       // A high-volume chucker now drags team efficiency more than a low-usage finisher lifts it.
+      // The captain gets double weight in that mean (his efficiency matters twice as much).
+      const effTotal = roster.reduce((a, _pl, i) => a + capW[i] * usages[i], 0);
       roster.forEach((player, i) => {
-        const w = totalUsage > 0 ? usages[i] / totalUsage : 1 / n;
+        const w = effTotal > 0 ? (capW[i] * usages[i]) / effTotal : 1 / n;
         score += w * zscore(player.cat[k], baselineFor(seasons, player, k), player.gp, p.reliabilityK);
       });
       score *= n;
     } else {
-      for (const player of roster) {
-        score += zscore(player.cat[k], baselineFor(seasons, player, k), player.gp, p.reliabilityK);
-      }
+      roster.forEach((player, i) => {
+        score += capW[i] * zscore(player.cat[k], baselineFor(seasons, player, k), player.gp, p.reliabilityK);
+      });
     }
     categoryScores[k] = score;
   }
@@ -279,6 +324,31 @@ export function projectRecord(roster, seasons, params = DEFAULT_PARAMS, arenaMul
       categoryScores[k] += Math.max(0, zscore(sixthMan.cat[k], baselineFor(seasons, sixthMan, k), sixthMan.gp, p.reliabilityK)) * bench;
     }
   }
+
+  // ERA RE-CENTERING (era-fairness). Judge the five against its OWN era's typical five, not a single
+  // modern-tilted bar. Each season carries a baked `catOffset` that lifts that season's category
+  // totals onto a common (modern-reference) scale, so a team that dominated its era projects like an
+  // equally dominant team from any other era. Baked by sim/bake_era_offsets.mjs; absent -> no change.
+  //
+  // The offset is the AVERAGE of the five men's own seasons. It used to be one season's offset — the
+  // roster's modal year — elected by a scan that kept the FIRST season to reach the highest count.
+  // Every normal mode draws each pick from a different club-season, so all five counts were 1 and the
+  // "modal year" was simply whoever happened to sit in the first slot: the same five arranged
+  // differently produced a different record in 64% of drafts, and the man at point guard silently
+  // decided the whole team's era. Averaging is both order-independent and truer — a five spanning
+  // 2003 to 2023 belongs to a blended era, not to one of its members' years — and it collapses to the
+  // old behaviour exactly when the five DO share a season, which is the intact-roster case.
+  const eraOff = {};
+  for (const k of CATEGORIES) eraOff[k] = 0;
+  let eraSeen = 0;
+  for (const pl of roster) {
+    const meta = pl && seasons && seasons[String(pl.season)];
+    const off = meta && meta.catOffset;
+    if (!off) continue;
+    eraSeen++;
+    for (const k of CATEGORIES) eraOff[k] += off[k] || 0;
+  }
+  if (eraSeen) for (const k of CATEGORIES) categoryScores[k] += eraOff[k] / eraSeen;
 
   const strength = CATEGORIES.reduce((acc, k) => acc + categoryScores[k], 0);
 

@@ -28,6 +28,13 @@ const OPP_BONUS = 5.0;
 // a great season = high seed, home court, you're the favourite; a bubble team = genuine underdog
 // every round. Pivot near a strong-playoff record so ~26 wins is roughly neutral. Deterministic
 // (record is seeded from the five), so it stays reproducible.
+// The play-in field is teams 7-10 - four mediocre sides - but opponents are drawn from a percentile
+// band of ALL club-seasons, so a bubble team was being handed a top-third all-time roster. That was
+// always wrong; with a single elimination game it simply never showed. Under the real two-game shape
+// it becomes decisive, so play-in opponents are pulled down to bubble strength. Tuned so a 9th/10th
+// seed still reaches the playoffs about as often as it did before the format changed (~13%) - the
+// point of this change is the STRUCTURE, not a difficulty swing.
+const PLAYIN_PEER = 4.6;
 const SEED_COEF = 0.62;
 const SEED_PIVOT = 26;
 
@@ -86,11 +93,29 @@ function opponentTable(pools, seasons) {
       if (starters.has(p.playerCode)) continue;
       depth += Math.max(0, playerStrength(p, seasons));
     }
-    list.push({ pool, S, rankS: S + DEPTH_WEIGHT * depth });
+    list.push({ pool, five, S, rankS: S + DEPTH_WEIGHT * depth });
   }
   list.sort((a, b) => b.rankS - a.rankS); // strongest (depth-adjusted) first
   OPP_TABLE = list;
   return list;
+}
+
+// SCENARIO Daily G.O.A.T.: resolve a fixed historical bracket path into playable opponents. Each step
+// names a real club-season (the team that actually stood in that round) plus a difficulty `bump`. We
+// field that club's best five and compute its GAME strength exactly like opponentTable (so a scenario
+// opponent is strengthed identically to a drawn one), keyed by round. Missing club-seasons fall back
+// to a normal draw. A pure function of (pools, seasons, path), so the client + resolver never disagree.
+function resolveFixedPath(pools, seasons, path) {
+  const byRound = {};
+  for (const step of path || []) {
+    const pool = pools.find((p) => p.teamCode === step.code && p.season === step.season);
+    if (!pool) continue;
+    const five = bestFive(pool);
+    if (!five) continue;
+    const S = projectRecord(five, seasons).S + OPP_BONUS;
+    byRound[step.round] = { pool, five, S, bump: step.bump || 0 };
+  }
+  return byRound;
 }
 
 // Draw an opponent from a strength band of the ranked table, WEIGHTED toward the stronger end of
@@ -138,46 +163,126 @@ function series(rng, a, b) {
  * Run the postseason for a completed five.
  * @returns {{stage:string, label:string, rounds:Array}}
  */
-export function runPostseason(roster, seasons, pools, wins, sixthMan = null) {
-  const rng = mulberry32(seedFrom(roster));
+// `boss` (0 by default) is the Legends-Boss escalation: the postseason opponents get an extra
+// strength bump, growing each round (the Final Four are legend-tier), so a legends five romps the
+// season but must survive a boss gauntlet for the title. Same value on client + resolver (a pure
+// function of the day's theme), so the bracket is reproduced identically for the anti-cheat.
+// `fixedPath` (Scenario Daily G.O.A.T.) pins the Playoffs/Semifinal/Final opponents to a team's REAL
+// historical bracket, each with a difficulty bump; the regular-season gates and the play-in stay
+// generic. A pure function of the day's scenario, so the anti-cheat resolver reproduces it exactly.
+export function runPostseason(roster, seasons, pools, wins, sixthMan = null, boss = 0, fixedPath = null) {
+  // Scenario brackets are SALTED by the build (the grafts). A locked-base icon scenario otherwise fixes
+  // the roster's player codes, so seedFrom() would hand every player the identical bracket and one
+  // unlucky RNG would make the day unwinnable for everyone. Salting by the grafted donor codes gives
+  // each build its own bracket luck, exactly like the free-base daily. Isomorphic: the client and the
+  // resolver build the identical GOAT.source, so the salt matches and the anti-cheat still reproduces it.
+  let seed = seedFrom(roster);
+  if (fixedPath) {
+    const g = roster.find((p) => p && p.source);
+    if (g) {
+      let h = seed >>> 0;
+      for (const k of Object.keys(g.source).sort()) {
+        const c = (g.source[k] && g.source[k].playerCode) || "";
+        for (let i = 0; i < c.length; i++) h = Math.imul(h ^ c.charCodeAt(i), 16777619) >>> 0;
+      }
+      seed = h >>> 0;
+    }
+  }
+  const rng = mulberry32(seed);
   const baseS = projectRecord(roster, seasons, undefined, 1, null, sixthMan).S;
   // SEED: reward the regular season. A strong record lifts your bracket strength (high seed / home
   // court); a bubble record drags it down (underdog). This is what makes the Final Four an
   // achievement instead of a coin flip for anyone who scrapes into the playoffs.
   const S = baseS + SEED_COEF * (wins - SEED_PIVOT);
   const table = opponentTable(pools, seasons);
+  const fixed = fixedPath ? resolveFixedPath(pools, seasons, fixedPath) : null;
   const used = new Set();
   const rounds = [];
 
   if (wins < REBUILD_CUT) return { stage: "relegation", label: "Eurocup team.", rounds };
   if (wins < ALMOST_CUT) return { stage: "rebuild", label: "Need to rebuild.", rounds };
-  if (wins < PLAYIN_CUT) return { stage: "almost", label: "Almost postseason.", rounds };
+  if (wins < PLAYIN_CUT) return { stage: "almost", label: "Almost Postseason.", rounds };
 
-  // 7th-10th: survive the play-in or go home
+  // 7th-10th: the play-in, in the REAL EuroLeague shape rather than one flat elimination game.
+  //   7v8  -> the winner takes the 7th playoff seed; the LOSER drops into the second game
+  //   9v10 -> the loser is out
+  //   loser(7v8) v winner(9v10) -> the winner takes the last playoff place
+  // So a 7th or 8th seed gets TWO bites, and a 9th or 10th seed has to win TWICE. Every play-in
+  // team used to play exactly one game, which handed 9th and 10th a far easier route in than the
+  // competition does. Seed bands mirror seedFor() in app.js: 23->7th, 22->8th, 21->9th, 20->10th.
   if (wins < PLAYOFF_CUT) {
-    const opp = pickOpponent(rng, table, 0.28, 0.55, used);
-    const g = game(rng, S, opp.S);
-    rounds.push({ name: "Play-in", opp: opp.pool, ...g });
-    if (!g.win) return { stage: "playin", label: "Eliminated in the play-in.", rounds };
+    const topHalf = wins >= 22; // 7th or 8th
+    // Opponent strength follows who you'd actually face. Game one is a PEER (7v8, or 9v10), so it is
+    // drawn from a band around your own level; the follow-up is whoever came out of the other tie -
+    // stronger if you are 9th/10th (the loser of 7v8), weaker if you are 7th/8th (the 9v10 survivor).
+    // Using the old flat band for a 9th seed's opener made it a coin flip against a better side and
+    // then a second game on top: 3.7% of 9th seeds reached the playoffs, which is not a play-in, it
+    // is a formality.
+    const first = pickOpponent(rng, table, topHalf ? 0.26 : 0.36, topHalf ? 0.52 : 0.64, used);
+    const g1 = game(rng, S, first.S - PLAYIN_PEER + boss * 0.4);
+    rounds.push({ name: topHalf ? "Play-in" : "Play-in R1", opp: first.pool, five: first.five, ...g1 });
+    if (topHalf) {
+      // lost the 7v8: one more chance, against whoever survived 9v10 — a weaker opponent
+      if (!g1.win) {
+        const second = pickOpponent(rng, table, 0.36, 0.64, used);
+        const g2 = game(rng, S, second.S - PLAYIN_PEER + boss * 0.4);
+        rounds.push({ name: "Play-in elimination", opp: second.pool, five: second.five, ...g2 });
+        if (!g2.win) return { stage: "playin", label: "Eliminated in the play-in.", rounds };
+      }
+    } else {
+      // 9th/10th: survive the first, then beat a side that finished above you
+      if (!g1.win) return { stage: "playin", label: "Eliminated in the play-in.", rounds };
+      const second = pickOpponent(rng, table, 0.26, 0.52, used);
+      const g2 = game(rng, S, second.S - PLAYIN_PEER + boss * 0.4);
+      rounds.push({ name: "Play-in final", opp: second.pool, five: second.five, ...g2 });
+      if (!g2.win) return { stage: "playin", label: "Eliminated in the play-in.", rounds };
+    }
   }
 
-  const qfOpp = pickOpponent(rng, table, 0, 0.12, used);
-  const qf = series(rng, S, qfOpp.S);
-  rounds.push({ name: "Playoffs", opp: qfOpp.pool, series: qf.tally, win: qf.win });
+  const qfFix = fixed && fixed.Playoffs;
+  const qfOpp = qfFix || pickOpponent(rng, table, 0, 0.12, used);
+  const qf = series(rng, S, qfOpp.S + boss * 0.5 + (qfFix ? qfFix.bump : 0));
+  rounds.push({ name: "Playoffs", opp: qfOpp.pool, five: qfOpp.five, series: qf.tally, win: qf.win });
   if (!qf.win) return { stage: "playoffs", label: "Lost in the playoffs.", rounds };
 
   // Deep-round escalation: the Final Four is a gauntlet. The semi and final opponents get an extra
   // edge (rest, neutral-court, the peak of the field) so even a juggernaut can't sleepwalk to the
   // title — winning it all should mean beating the best when it counts.
-  const sfOpp = pickOpponent(rng, table, 0, 0.05, used);
-  const sf = game(rng, S, sfOpp.S + 1.2);
-  rounds.push({ name: "Final Four semi-final", opp: sfOpp.pool, ...sf });
+  const sfFix = fixed && fixed.Semifinal;
+  const sfOpp = sfFix || pickOpponent(rng, table, 0, 0.05, used);
+  const sf = game(rng, S, sfOpp.S + 1.2 + boss * 0.85 + (sfFix ? sfFix.bump : 0));
+  rounds.push({ name: "Semifinal", opp: sfOpp.pool, five: sfOpp.five, ...sf });
   if (!sf.win) return { stage: "finalfour", label: "Final Four team.", rounds };
 
-  const fOpp = pickOpponent(rng, table, 0, 0.015, used);
-  const f = game(rng, S, fOpp.S + 2.6);
-  rounds.push({ name: "Final", opp: fOpp.pool, ...f });
+  // Final opponent from the top ~2.3% (≈12 club-seasons). Wider than the old top-1.5% (7) so the
+  // final isn't the same handful of teams every time — there are genuinely ~a dozen title-calibre
+  // rosters. The rng²-weighting still favours the very top, so #1–3 remain the likeliest final boss.
+  // The final edge was raised 2.6 → 3.9 to offset the wider (slightly weaker-on-average) pool: with
+  // it, no win-bucket beats its pre-widening title rate (perfect-season ~48.5% vs ~49.7% before,
+  // 28-31 ~11.2% vs ~10.8%) — verified at N=12000 in sim/bracket_diag.mjs. Variety up, difficulty held.
+  const fFix = fixed && fixed.Final;
+  const fOpp = fFix || pickOpponent(rng, table, 0, 0.024, used);
+  const f = game(rng, S, fOpp.S + 3.9 + boss * 1.0 + (fFix ? fFix.bump : 0));
+  rounds.push({ name: "Final", opp: fOpp.pool, five: fOpp.five, ...f });
   if (!f.win) return { stage: "lostfinal", label: "Lost in the final.", rounds };
 
   return { stage: "champion", label: "EuroLeague Champions.", rounds };
+}
+
+// THE BRACKET/SEASON SCORE, shared by Classic and G.O.A.T. Regular season = 100 per win (38-0 →
+// 3800). Then the bracket: +100 per playoff game won, −100 per game lost (a best-of-five sweep =
+// +300). The two Final Four games (Semifinal + Final) also add their point MARGIN (win by 12 → +12,
+// lose by 8 → −8) — the closing-game drama. G.O.A.T. layers award/season bonuses ON TOP of this.
+export function classicScore(wins, post) {
+  let score = wins * 100;
+  for (const r of post.rounds || []) {
+    if (r.series) {
+      const [w, l] = r.series.split(/[^\d]+/).map(Number); // "3–1" → [3,1]
+      score += (w - l) * 100;
+    } else {
+      score += r.win ? 100 : -100;
+      if (r.name === "Semifinal" || r.name === "Final") score += (r.us || 0) - (r.them || 0);
+    }
+  }
+  return score;
 }

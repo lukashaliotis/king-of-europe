@@ -1,5 +1,6 @@
 // Home arenas — Phase 2, wrinkle 1 of 3.
 //
+// (FLAME_PATH is shared with the icon set so the arena meter and the streak flame are one glyph.)
 // SPEC rules this obeys:
 //  - Arena must NOT add to strength. It multiplies the win-curve OUTPUT only (~±3-5%).
 //    Because the top of the curve is a cliff, a few percent near perfection is decisive and
@@ -10,6 +11,7 @@
 //    moving buildings. Modelled as (club, building, year_range).
 //
 // Ratings are 1-10 and unashamedly subjective. Veto freely.
+import { FLAME_PATH, isClassicLook } from "./icons.js";
 
 const NEUTRAL = 6.5;   // rating that yields no effect
 const SPREAD = 3.5;    // ratings this far from NEUTRAL hit the cap
@@ -51,7 +53,7 @@ export const ARENAS = {
   BES: [{ name: "BJK Akatlar Arena", from: 2001, to: 2025, rating: 8, cap: 3.2 }],
   BAM: [{ name: "Brose Arena", from: 2001, to: 2017, rating: 7.5, cap: 6.8 }],
   CIB: [{ name: "Dražen Petrović Hall", from: 2001, to: 2016, rating: 7.5, cap: 5.4 }],
-  BAR: [{ name: "Palau Blaugrana", from: 2001, to: 2025, rating: 7.5, cap: 7.5 }],
+  BAR: [{ name: "Palau Blaugrana", from: 2001, to: 2025, rating: 8, cap: 7.5 }],
   MUN: [{ name: "Audi Dome", from: 2010, to: 2024, rating: 7, cap: 6.7 },
         { name: "SAP Garden", from: 2025, to: 2025, rating: 7.5, cap: 11.5 }],
   STR: [{ name: "Rhénus Sport", from: 2001, to: 2025, rating: 7.5, cap: 6.2 }],
@@ -65,7 +67,7 @@ export const ARENAS = {
   KLA: [{ name: "Švyturio Arena", from: 2001, to: 2025, rating: 7.5, cap: 6.3 }],
   BIL: [{ name: "Bilbao Arena (Miribilla)", from: 2001, to: 2025, rating: 7.5, cap: 10 }],
   ASV: [{ name: "Astroballe", from: 2001, to: 2023, rating: 7, cap: 5.6 },
-        { name: "LDLC Arena", from: 2024, to: 2025, rating: 6.5, cap: 12.5 }],
+        { name: "LDLC Arena", from: 2024, to: 2025, rating: 7, cap: 12.5 }],
   AEK: [{ name: "OAKA / Ano Liosia", from: 2001, to: 2025, rating: 7, cap: 9 }],
   LJU: [{ name: "Tivoli / Stožice", from: 2001, to: 2025, rating: 7, cap: 12 }],
   LIE: [{ name: "Rytas Arena", from: 2001, to: 2025, rating: 7, cap: 11 }],
@@ -80,7 +82,7 @@ export const ARENAS = {
   NAN: [{ name: "Palais des Sports Jean Weille", from: 2001, to: 2025, rating: 7, cap: 6 }],
   GSS: [{ name: "Hala CRS Zielona Góra", from: 2001, to: 2025, rating: 7, cap: 5.5 }],
   PRS: [{ name: "Adidas Arena", from: 2024, to: 2025, rating: 7, cap: 8 }],
-  PER: [{ name: "Peristeri Stadium", from: 2001, to: 2025, rating: 7, cap: 4 }],
+  PER: [{ name: "Peristéri Stadium", from: 2001, to: 2025, rating: 7, cap: 4 }],
   OOS: [{ name: "COREtec Dôme", from: 2001, to: 2025, rating: 7, cap: 5 }],
   EST: [{ name: "Palacio de Deportes de Madrid", from: 2001, to: 2025, rating: 7, cap: 10 }],
   NAP: [{ name: "PalaBarbuto", from: 2001, to: 2025, rating: 7, cap: 3.5 }],
@@ -91,7 +93,7 @@ export const ARENAS = {
   NTR: [{ name: "Palais des Sports Maurice Thorez", from: 2001, to: 2025, rating: 7, cap: 3 }],
   CAN: [{ name: "Gran Canaria Arena", from: 2014, to: 2025, rating: 7, cap: 11 }],
   MCO: [{ name: "Salle Gaston Médecin", from: 2021, to: 2025, rating: 6.5, cap: 5 }],
-  BER: [{ name: "Max-Schmeling / Mercedes-Benz Arena", from: 2001, to: 2025, rating: 6.5, cap: 14.5 }],
+  BER: [{ name: "Max-Schmeling / Mercedes-Benz Arena", from: 2001, to: 2025, rating: 7.0, cap: 14.5 }],
   ROM: [{ name: "PalaLottomatica", from: 2001, to: 2013, rating: 6.5, cap: 11.2 }],
   SOP: [{ name: "Gdynia Arena", from: 2001, to: 2025, rating: 6.5, cap: 5.5 }],
   CSK: [{ name: "USH CSKA", from: 2001, to: 2014, rating: 6.5, cap: 5 },
@@ -129,10 +131,34 @@ export function arenaFor(teamCode, season) {
   return { name: hit.name, rating: hit.rating, mult: ratingToMult(hit.rating), cap: hit.cap ?? 8, known: true };
 }
 
-/** 0-5 flames for display. */
+// A stable key for a specific BUILDING. A club can use different buildings across eras (Žalgiris:
+// Kaunas Sports Hall pre-2011 vs Žalgirio Arena after), so two same-club players from different
+// arena-eras key DIFFERENTLY — each building is then its own home-arena candidate, and the home
+// edge scales by how many of your five actually played in THAT building. Used isomorphically by the
+// client spin AND the anti-cheat resolvers, so they can never disagree.
+export const arenaKey = (teamCode, season) => `${teamCode}|${arenaFor(teamCode, season).name}`;
+
+/** A 0-5 flame atmosphere METER (markup): `lit` flames for the rating, faint ones for the rest.
+ *  The flame is a vector silhouette (NOT the 🔥 emoji) so it takes the brand colour and stays crisp. */
+// The 1-5 band a rating falls in. The flame meter AND the Team Report's wording both read this, so
+// they cannot drift apart — Palau Blaugrana (7.5) drew two flames while the report called it "a real
+// edge", because the two had separate thresholds.
+export function arenaTier(rating) {
+  return rating > 9.15 ? 5 : rating > 8.75 ? 4 : rating > 7.75 ? 3 : rating > 6.75 ? 2 : 1;
+}
+
 export function arenaFlames(rating) {
-  const n = Math.max(1, Math.min(5, Math.round((rating - 5) / 1.1)));
-  return "▲".repeat(n);
+  // Rating bands → 1–5 flames. Bands are placed on the rating clusters so the very top cauldrons
+  // (9.3+: OAKA, Peace & Friendship, Pionir, Belgrade Arena) finally read 5/5, 9.0 stays 4, the 8s
+  // are 3, the 7s are 2, and a dead 6.5 room is 1. Display only — the win multiplier still uses the
+  // raw rating, so this changes no gameplay.
+  const n = arenaTier(rating);
+  if (isClassicLook()) return "▲".repeat(n); // Classic look: the original triangles
+  let out = "";
+  for (let i = 0; i < 5; i++) {
+    out += `<svg class="flame ${i < n ? "lit" : "dim"}" viewBox="0 0 24 24" aria-hidden="true"><path d="${FLAME_PATH}"/></svg>`;
+  }
+  return out;
 }
 
 /**
