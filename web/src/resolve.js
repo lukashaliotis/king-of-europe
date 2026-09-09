@@ -10,18 +10,21 @@
 import { buildClubSeasons } from "./data.js";
 import { projectRecord } from "./engine.js";
 import { runPostseason } from "./postseason.js";
-import { arenaFor } from "./arenas.js";
+import { arenaFor, arenaKey } from "./arenas.js";
 import { eligibleCoaches, coachDeltas } from "./coaches.js";
 import { legendsPool, LEGENDS_CHANCE } from "./legends.js";
 import { mulberry32, hashSeed, dailySeed, buildDailyBoard, rosterSignature } from "./daily.js";
+import { dailyThemeFor, rulesetOf, buildThemedDailyBoard, bossFor } from "./dailytheme.js";
 
 const LEGENDS = legendsPool();
 
 export function dailyPools(data) {
   return buildClubSeasons(data);
 }
+// Reproduce the exact board the client built — one shared isomorphic builder, so the anti-cheat can
+// never diverge (themed pool filter, ruleset floor, Legends-Boss board all live in one place).
 export function dailyBoard(pools, dayKey, seasons) {
-  return buildDailyBoard(pools, LEGENDS, LEGENDS_CHANCE, dailySeed(dayKey), 6, seasons);
+  return buildThemedDailyBoard(pools, dayKey, seasons);
 }
 
 const fail = (error) => ({ ok: false, error });
@@ -64,25 +67,37 @@ export function resolveDaily(data, dayKey, submission) {
   const sixth = reconstruct(board[sixthIn.slot], sixthIn.code);
   if (!sixth) return fail("sixth man was not in its draw");
 
-  // No human twice, and a legal starting five: two guards, two forwards, one centre.
+  // No human twice, and a legal starting five for THIS board's ruleset (2G/2F/1C normally; five
+  // guards on a rare Guard-Gauntlet day). The ruleset is a pure function of the date, so the check
+  // matches the client's slots exactly.
   const codes = [...starters, sixth].map((s) => s.playerCode);
   if (new Set(codes).size !== 6) return fail("the same player was used twice");
+  const ruleset = rulesetOf(dailyThemeFor(dayKey));
+  const need = {}; ruleset.roles.forEach((r) => { need[r] = (need[r] || 0) + 1; });
   const pos = starters.reduce((m, s) => ((m[s.pos] = (m[s.pos] || 0) + 1), m), {});
-  if (pos.G !== 2 || pos.F !== 2 || pos.C !== 1) return fail("illegal position mix for a starting five");
+  if (Object.keys(need).some((k) => (pos[k] || 0) !== need[k]) || Object.keys(pos).some((k) => !need[k]))
+    return fail("illegal position mix for this board");
+  // Single-position days: the bench player must match too (else a smuggled off-position player covers
+  // the gate). The role-count check above already constrains the starting five.
+  if (ruleset.soloPos && sixth.pos !== ruleset.soloPos)
+    return fail(`the sixth man must be a ${({ G: "guard", F: "forward", C: "center" })[ruleset.soloPos]} on this board`);
 
-  // Home arena — daily is SEEDED (not chosen): reproduce the exact weighted spin, share-scaled.
+  // Home arena — daily is SEEDED (not chosen): reproduce the EXACT weighted spin, share-scaled.
+  // Dedup + weight + share by BUILDING (arena-era), mirroring the client's arenaChoices/arenaInfoFor
+  // — same starter order, so the seeded target + mult match bit-for-bit.
   const firstIdx = new Map();
-  starters.forEach((s, i) => { if (!firstIdx.has(s._src.teamCode)) firstIdx.set(s._src.teamCode, i); });
+  starters.forEach((s, i) => { const k = arenaKey(s._src.teamCode, s.season); if (!firstIdx.has(k)) firstIdx.set(k, i); });
   const weighted = [];
   for (const i of firstIdx.values()) {
-    const n = starters.filter((x) => x._src.teamCode === starters[i]._src.teamCode).length;
+    const key = arenaKey(starters[i]._src.teamCode, starters[i].season);
+    const n = starters.filter((x) => arenaKey(x._src.teamCode, x.season) === key).length;
     for (let k = 0; k < n; k++) weighted.push(i);
   }
   const rand = mulberry32(dailySeed(dayKey) ^ hashSeed(rosterSignature(starters)))();
   const target = weighted[(rand * weighted.length) | 0];
-  const homeTeam = starters[target]._src.teamCode;
-  const base = arenaFor(homeTeam, starters[target].season);
-  const homeCount = starters.filter((x) => x._src.teamCode === homeTeam).length;
+  const homeKey = arenaKey(starters[target]._src.teamCode, starters[target].season);
+  const base = arenaFor(starters[target]._src.teamCode, starters[target].season);
+  const homeCount = starters.filter((x) => arenaKey(x._src.teamCode, x.season) === homeKey).length;
   const arenaMult = 1 + (base.mult - 1) * (homeCount / 5);
 
   // Coach — the one genuine choice. Must have coached at least one of the five.
@@ -95,7 +110,7 @@ export function resolveDaily(data, dayKey, submission) {
   }
 
   const res = projectRecord(starters, data.seasons, undefined, arenaMult, catDeltas, sixth);
-  const post = runPostseason(starters, data.seasons, pools, res.wins, sixth);
+  const post = runPostseason(starters, data.seasons, pools, res.wins, sixth, bossFor(dailyThemeFor(dayKey)));
   return {
     ok: true,
     wins: res.wins, losses: res.losses,

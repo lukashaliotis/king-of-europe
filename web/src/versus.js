@@ -3,7 +3,7 @@
 // the challenger's five and sims a best-of-seven locally. No backend: the code carries the seed
 // (so both boards match) and the challenger's roster (so the duel can be resolved offline).
 import { projectRecord, playerStrength, gameProbability } from "./engine.js";
-import { arenaFor } from "./arenas.js";
+import { arenaFor, arenaKey } from "./arenas.js";
 import { eligibleCoaches, coachDeltas } from "./coaches.js";
 import { mulberry32, hashSeed } from "./daily.js";
 
@@ -73,7 +73,9 @@ export function reconstructTeam(env, data, board) {
   if (env.arenaIdx >= 0 && players[env.arenaIdx]) {
     const host = players[env.arenaIdx];
     const base = arenaFor(host._src.teamCode, host.season);
-    const share = starters.filter((s) => s._src.teamCode === host._src.teamCode).length / 5;
+    // Share-scaled by BUILDING (same club + arena-era), matching the live game's arenaInfoFor.
+    const hostKey = arenaKey(host._src.teamCode, host.season);
+    const share = starters.filter((s) => arenaKey(s._src.teamCode, s.season) === hostKey).length / 5;
     arenaMult = 1 + (base.mult - 1) * share;
     arenaName = base.name;
   }

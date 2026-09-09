@@ -6,7 +6,7 @@
 // with esc=1.1 a great run (p90) ≈ 12 wins and an exceptional one (p95) ≈ 15. Re-tune HERE.
 import { projectRecord, gameProbability, DEFAULT_PARAMS, mulberry32 } from "./engine.js";
 import { arenaFor } from "./arenas.js";
-import { hashSeed } from "./daily.js";
+import { hashSeed, arrangeBoard } from "./daily.js";
 
 export const DYN = {
   F0: 3,          // round-1 draw floor: weak-ish opponents early so the first games are winnable
@@ -198,10 +198,12 @@ export function buildDynastyBoard(pools, seed, size = 5) {
       used.add(pool.id); board.push(pool);
     }
     if (board.length !== size) continue;
-    if (boardCanFieldLegalFive(board)) return board;
+    // Defer the centre-capable draws to the tail (5v5, so the standard five's positions), same soft-lock
+    // relief as the Daily board. Order-only; shared with the dynasty resolver, so both stay in step.
+    if (boardCanFieldLegalFive(board)) return arrangeBoard(board, ["G", "G", "F", "F", "C"]);
     if (!fallback) fallback = board;
   }
-  return fallback;
+  return fallback ? arrangeBoard(fallback, ["G", "G", "F", "F", "C"]) : fallback;
 }
 
 /* ---------------- determinism (for replay + the leaderboards) ---------------- */

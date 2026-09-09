@@ -10,23 +10,27 @@
 
 const BASE_SEASON = 2012; // real season whose per-position baseline we z-score the legends against
 
-// name, pos, [pts, reb, ast, stl, blk, ts%, tov]  (per game, prime, European play — ESTIMATED)
+// name, pos, [pts, reb, ast, stl, blk, ts%, tov, mpg]  (per game, prime, European play — ESTIMATED)
+// Each legend is a light-touch SPECIALIST — best-in-class at one category so the golden pick patches
+// a specific need (see docs/DECISIONS.md). Verified pool-neutral vs the old all-rounder lines
+// (total strength 114.6 → 115.3, peak legends-five 37.8 → 37.9 exp wins — no recalibration needed).
+// Minutes are varied (30–36 by stature) so legends no longer clump together in the MIN sort.
 const RAW = [
-  ["PETROVIC, DRAZEN", "G", 28, 4, 5, 2.0, 0.1, 0.62, 2.5],
-  ["GALIS, NIKOS", "G", 30, 4, 4, 2.0, 0.1, 0.58, 2.8],
-  ["DJORDJEVIC, ALEKSANDAR", "G", 17, 3, 7, 1.5, 0.1, 0.61, 2.5],
-  ["MARCIULIONIS, SARUNAS", "G", 22, 4, 5, 2.0, 0.1, 0.60, 2.8],
-  ["GIANNAKIS, PANAGIOTIS", "G", 19, 3, 6, 1.6, 0.1, 0.57, 2.5],
-  ["KUKOC, TONI", "F", 20, 8, 7, 1.6, 0.5, 0.60, 2.8],
-  ["BODIROGA, DEJAN", "F", 19, 6, 5, 1.3, 0.3, 0.58, 2.5],
-  ["RADJA, DINO", "F", 22, 10, 2, 1.0, 1.5, 0.59, 2.3],
-  ["SAN EPIFANIO, JUAN ANTONIO", "F", 18, 5, 4, 1.2, 0.4, 0.59, 2.0],
-  ["SABONIS, ARVYDAS", "C", 22, 13, 5, 1.0, 2.0, 0.60, 3.0],
-  ["DIVAC, VLADE", "C", 16, 11, 3, 1.0, 2.0, 0.57, 2.5],
-  ["SAVIC, ZORAN", "C", 15, 8, 2, 0.8, 1.5, 0.58, 2.0],
+  ["PETROVIC, DRAZEN", "G", 27, 3, 4, 1.5, 0.1, 0.64, 2.2, 36], // efficiency
+  ["GALIS, NIKOS", "G", 31, 4, 3, 1.6, 0.1, 0.55, 3.0, 36], // scoring (volume, low eff)
+  ["DJORDJEVIC, ALEKSANDAR", "G", 16, 3, 8, 1.3, 0.1, 0.62, 2.3, 33], // playmaking
+  ["MARCIULIONIS, SARUNAS", "G", 21, 4, 5, 2.6, 0.3, 0.58, 2.8, 33], // defense (steals)
+  ["GIANNAKIS, PANAGIOTIS", "G", 14, 5, 7, 2.0, 0.2, 0.56, 2.6, 32], // rebounding (pass-first)
+  ["KUKOC, TONI", "F", 19, 7, 7, 1.5, 0.5, 0.60, 2.6, 34], // playmaking (point-forward)
+  ["BODIROGA, DEJAN", "F", 19, 5, 5, 1.3, 0.3, 0.63, 2.2, 32], // efficiency
+  ["RADJA, DINO", "F", 21, 11, 2, 1.0, 1.6, 0.58, 2.3, 33], // rebounding
+  ["SAN EPIFANIO, JUAN ANTONIO", "F", 23, 5, 3, 1.2, 0.4, 0.60, 1.9, 31], // scoring
+  ["SABONIS, ARVYDAS", "C", 22, 12, 5, 1.0, 1.8, 0.60, 3.0, 34], // scoring + playmaking
+  ["DIVAC, VLADE", "C", 13, 13, 3, 1.2, 2.5, 0.55, 2.5, 33], // defense + rebounding
+  ["SAVIC, ZORAN", "C", 16, 8, 2, 0.7, 1.2, 0.64, 1.8, 30], // efficiency (post)
 ];
 
-function makeLegend([name, pos, pts, reb, ast, stl, blk, ts, tov]) {
+function makeLegend([name, pos, pts, reb, ast, stl, blk, ts, tov, mpg]) {
   const surname = name.split(",")[0].replace(/[^A-Z]/gi, "");
   return {
     season: BASE_SEASON,
@@ -34,7 +38,7 @@ function makeLegend([name, pos, pts, reb, ast, stl, blk, ts, tov]) {
     playerName: name,
     teamCode: "LEG",
     teamName: "European Legends",
-    gp: 20, mpg: 32, pos, q: true, legend: true,
+    gp: 20, mpg, pos, q: true, legend: true,
     cat: { scoring: pts, rebounding: reb, playmaking: ast - tov, defense: stl + blk, efficiency: ts },
     box: { pts, reb, ast, stl, blk, ts, fga: +(pts * 0.72).toFixed(1) },
     pir: Math.round(pts + reb + ast + stl + blk),
@@ -52,4 +56,7 @@ export function legendsPool() {
   };
 }
 
-export const LEGENDS_CHANCE = 0.03; // ~1 in 33 main spins draws the Legends
+// Per SPIN, not per game — and a Classic run takes six spins, so this compounds:
+// 1 - (1-p)^6. At the old 0.03 that was ~17% of games (1 in 6), far too common for a "nugget".
+// 0.0085 => ~5% of games, about 1 in 20.
+export const LEGENDS_CHANCE = 0.0085;

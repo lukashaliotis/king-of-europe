@@ -3,7 +3,32 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>King of Europe</title>
+  <title>King of Europe: EuroLeague fantasy, one perfect season</title>
+  <meta name="description" content="Draft a EuroLeague five from real clubs and years, balance five categories, and chase a perfect 38–0 season. Play Classic, Daily, or the Dynasty gauntlet, and climb the leaderboards." />
+  <meta name="theme-color" content="#0e1420" />
+
+  <!-- Favicon — the game's own mark, drawn inline (no external asset, no crests/logos). The Classic
+       look uses the gold crown; the Modern look swaps to the crown-on-ball emblem (see setLook). -->
+  <link id="favicon" rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 30'%3E%3Cpath d='M2 26 L6 8 L14 17 L20 4 L26 17 L34 8 L38 26 Z' fill='%23e0a83a'/%3E%3Ccircle cx='6' cy='6' r='2.6' fill='%23e0a83a'/%3E%3Ccircle cx='20' cy='3.5' r='3' fill='%23e0a83a'/%3E%3Ccircle cx='34' cy='6' r='2.6' fill='%23e0a83a'/%3E%3C/svg%3E" />
+
+  <!-- Link preview (Open Graph + Twitter) — a pasted link renders as a card, not a bare URL. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="King of Europe" />
+  <meta property="og:title" content="King of Europe: chase a perfect 38–0 season" />
+  <meta property="og:description" content="Draft a EuroLeague five from real clubs and years, balance five categories, and chase a perfect 38–0 season. Classic, Daily, and the Dynasty gauntlet, with leaderboards." />
+  <meta property="og:url" content="https://king-of-europe.pages.dev/" />
+  <meta property="og:image" content="https://king-of-europe.pages.dev/og.png" />
+  <meta property="og:image:secure_url" content="https://king-of-europe.pages.dev/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="King of Europe: draft a EuroLeague five and chase a perfect 38–0 season." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="King of Europe: chase a perfect 38–0 season" />
+  <meta name="twitter:description" content="Draft a EuroLeague five, balance five categories, and chase a perfect 38–0 season. Classic, Daily, and the Dynasty gauntlet." />
+  <meta name="twitter:image" content="https://king-of-europe.pages.dev/og.png" />
+
+  <link rel="stylesheet" href="web/src/fonts.css" />
   <link rel="stylesheet" href="web/src/style.css" />
   <script>
     // Set the theme before first paint to avoid a flash. A stored choice always wins; with no
@@ -13,6 +38,9 @@
         var saved = localStorage.getItem("koe-theme");
         var dark = saved ? saved === "dark" : true;
         document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        // Look: "modern" (default, the SVG-icon redesign) or "classic" (the original emoji look).
+        var look = localStorage.getItem("koe-look") || "modern";
+        document.documentElement.setAttribute("data-look", look);
       } catch (e) {}
     })();
   </script>
@@ -20,9 +48,15 @@
 <body>
   <div id="onboarding" class="onboarding hidden"></div>
   <div id="lb-hub" class="lb-hub hidden"></div>
+  <div id="cat-modal" class="cat-modal hidden"></div>
+  <div id="court-modal" class="cat-modal hidden"></div>
+  <div id="badge-modal" class="badge-modal hidden"></div>
+  <div id="crews-modal" class="crews-modal hidden"></div>
+  <div id="feat-unlock" class="feat-unlock hidden"></div>
+  <div id="champ-celebrate" class="champ-celebrate hidden"></div>
   <header class="topbar">
     <div class="topbar-side">
-      <div class="logo">
+      <div class="logo logo-classic">
         <div class="logo-type">
           <span class="line1">
             <span class="kwrap">
@@ -43,6 +77,23 @@
           </g>
         </svg>
       </div>
+      <!-- Modern-look lockup: 1b crown-on-ball emblem + Archivo ExtraBold wordmark (King · of / Europe). Shown
+           only under data-look="modern"; the Classic lockup above is shown otherwise. -->
+      <div class="logo logo-modern" aria-label="King of Europe">
+        <div class="m-emblem" aria-hidden="true">
+          <svg class="m-crown" viewBox="0 0 64 40"><path d="M2 14 L14 26 L32 2 L50 26 L62 14 L56 38 L8 38 Z" /></svg>
+          <svg class="m-ball" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="45" fill="none" stroke-width="5" />
+            <path d="M50 5 V95 M5 50 H95" stroke-width="5" fill="none" />
+            <path d="M19 14 C34 32 34 68 19 86" stroke-width="5" fill="none" />
+            <path d="M81 14 C66 32 66 68 81 86" stroke-width="5" fill="none" />
+          </svg>
+        </div>
+        <div class="m-type">
+          <span class="m-l1">King<span class="m-of">of</span></span>
+          <span class="m-l2">Europe</span>
+        </div>
+      </div>
     </div>
     <div class="topbar-side">
       <div class="modes" id="modes">
@@ -51,28 +102,64 @@
         <button class="mode-tab" data-mode="versus" type="button">Versus</button>
         <button class="mode-tab" data-mode="salary" type="button">Salary</button>
         <button class="mode-tab" data-mode="dynasty" type="button">Dynasty</button>
+        <button class="mode-tab" data-mode="goat" type="button">G.O.A.T.</button>
       </div>
-      <button id="lb-hub-btn" class="corner-btn hub-btn" type="button" title="Leaderboards" aria-label="Leaderboards">🏆</button>
+      <!-- Mobile only: the five tabs collapse into a compact dropdown (desktop keeps the tabs). -->
+      <select id="mode-select" class="mode-select" aria-label="Game mode">
+        <option value="classic">Classic</option>
+        <option value="daily">Daily</option>
+        <option value="versus">Versus</option>
+        <option value="salary">Salary</option>
+        <option value="dynasty">Dynasty</option>
+        <option value="goat">G.O.A.T.</option>
+      </select>
+      <button id="lb-hub-btn" class="corner-btn hub-btn" type="button" title="Leaderboards" aria-label="Leaderboards"><svg class="ic gold" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg></button>
       <button id="help-btn" class="corner-btn help-btn" type="button" title="How to play" aria-label="How to play">?</button>
-      <button id="theme-toggle" class="corner-btn theme-toggle" type="button"
-              title="Toggle light / dark" aria-label="Toggle light or dark mode">
-        <span class="moon" aria-hidden="true">🌙</span><span class="sun" aria-hidden="true">☀️</span>
-      </button>
+      <div class="settings-wrap">
+        <button id="settings-btn" class="corner-btn settings-btn" type="button" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false"></button>
+        <div id="settings-menu" class="settings-menu hidden" role="dialog" aria-label="Settings">
+          <div class="set-row">
+            <span class="set-lbl">Theme</span>
+            <div class="seg" id="seg-theme" role="group" aria-label="Theme">
+              <button class="seg-opt" type="button" data-theme-opt="dark">Dark</button>
+              <button class="seg-opt" type="button" data-theme-opt="light">Light</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span class="set-lbl">Look</span>
+            <div class="seg" id="seg-look" role="group" aria-label="Look">
+              <button class="seg-opt" type="button" data-look-opt="modern">Modern</button>
+              <button class="seg-opt" type="button" data-look-opt="classic">Classic</button>
+            </div>
+          </div>
+          <div class="set-sep"></div>
+          <div class="set-profile">
+            <span class="set-lbl">Profile</span>
+            <input id="pf-name" class="pf-input" type="text" maxlength="20" placeholder="Your name" autocomplete="off" />
+            <select id="pf-country" class="pf-select" aria-label="Country"></select>
+            <select id="pf-team" class="pf-select" aria-label="Favorite club"></select>
+            <span class="pf-hint">Shown on the leaderboards. Enables country &amp; team rankings.</span>
+            <!-- mark is painted by paintStaticIcons(): the medal SVG in Modern, the emoji in Classic -->
+            <button id="pf-badges" class="pf-badges-btn" type="button">Badges</button>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 
   <main id="app">
-    <div class="daily-bar hidden" id="daily-bar"></div>
-
     <div class="control" id="control-bar">
-      <div class="pickinfo" id="pickinfo">Pick 1 of 5</div>
-      <div class="spin-group">
-        <button id="spin-btn" class="spin-btn">Spin</button>
+      <div class="ctl-mid">
+        <div class="pickinfo" id="pickinfo">Pick 1 of 6</div>
+        <div class="spin-group"><button id="spin-btn" class="spin-btn">Spin</button></div>
+      </div>
+      <div class="ctl-side">
         <span class="respins" title="One of each, per playthrough">
           <button id="spin-club-btn" class="mini-btn" title="Re-spin the club, keep the year">↻ Club</button>
           <button id="spin-year-btn" class="mini-btn" title="Re-spin the year, keep the club">↻ Year</button>
           <button id="spin-both-btn" class="mini-btn" title="Re-spin both club and year">↻ Both</button>
         </span>
+        <div class="daily-bar hidden" id="daily-bar"></div>
       </div>
       <button id="reset-btn" class="ghost-btn hidden">Start over</button>
     </div>
@@ -104,7 +191,12 @@
           </svg>
           <div class="court-sweep" id="court-sweep"></div>
           <div id="court-spots"></div>
+          <button id="court-flip-ctrl" class="court-flip-ctrl hidden" type="button" title="See the best possible five"></button>
         </div>
+        <div id="court-caption" class="court-caption hidden"></div>
+        <!-- Mobile only: the category bars scroll out of view during the draft, so a peek button by
+             the court opens them in a popup. Desktop keeps the inline bars below. -->
+        <button id="cat-peek" class="cat-peek hidden" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 16v-5"/><path d="M12 16V8"/><path d="M17 16v-3"/></svg> Category balance</button>
         <div id="sixth-slot" class="sixth-slot"></div>
         <p class="place-hint" id="place-hint"></p>
 
@@ -117,22 +209,28 @@
         </div>
       </aside>
     </div>
+
+    <!-- Mobile only: the five court slots as a compact bottom tray, so you place without scrolling to
+         the court while drafting. Mirrors the court state; desktop hides it (the full court is enough). -->
+    <div id="court-tray" class="court-tray hidden" aria-label="Your five"></div>
   </main>
+
+  <!-- Mobile only: a slim bottom nav. The leaderboard / help / settings live in the top bar (next to
+       the logo), so the bar carries just the three in-play peeks: Court (your five), the center action
+       (Spin → Play), and Ratings (category balance). Desktop hides the whole bar. -->
+  <nav id="mobile-nav" class="mobile-nav" aria-label="Main">
+    <button class="mnav-btn" id="mnav-court" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/><circle cx="12" cy="12" r="2.4"/><path d="M3 9h3v6H3M21 9h-3v6h3"/></svg><span>Court</span></button>
+    <button class="mnav-btn mnav-play" id="mnav-play" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2.5 12h19M12 2.5c2.5 2.6 4 6 4 9.5s-1.5 6.9-4 9.5c-2.5-2.6-4-6-4-9.5s1.5-6.9 4-9.5Z"/></svg><span>Play</span></button>
+    <button class="mnav-btn" id="mnav-balance" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 16v-5"/><path d="M12 16V8"/><path d="M17 16v-3"/></svg><span>Ratings</span></button>
+  </nav>
 
   <footer class="footnote">
     Player names and statistics are facts, used here for a game. No club crests, logos, or
     photographs. <strong>Not affiliated with EuroLeague Basketball.</strong>
   </footer>
 
-  <script>
-    // Toggle + persist. The pre-paint script above set the initial theme.
-    document.getElementById("theme-toggle").addEventListener("click", function () {
-      var root = document.documentElement;
-      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
-      root.setAttribute("data-theme", next);
-      try { localStorage.setItem("koe-theme", next); } catch (e) {}
-    });
-  </script>
+  <!-- Theme + Look toggles now live in the Settings (gear) popup, wired in app.js. The pre-paint
+       script in <head> still sets the initial theme/look before first paint. -->
   <script type="module" src="web/src/app.js"></script>
 </body>
 </html>

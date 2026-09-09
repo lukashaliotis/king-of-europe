@@ -107,6 +107,25 @@ const PEDIGREE = {
   WAW: PEDIGREE_STRONG, // Ivanović, Duško
   KBM: PEDIGREE_STRONG, // Sfairopoulos, Ioannis
   CYP: PEDIGREE_STRONG, // Trinchieri, Andrea
+  // Final Four floor — every head coach who reached a real EuroLeague Final Four is lifted to at
+  // least Proven. Derived by cross-referencing the official FF history (2001-2026) against each
+  // club-season's most-tenured coach in our data (the head-coach proxy); see the FF audit.
+  JUV: PEDIGREE_STRONG, // Giannakis, Panagiotis — Olympiacos, EuroLeague-winning coach + a legend as a player
+  WAT: PEDIGREE_STRONG, // García Reneses, Aíto — 2003 EuroLeague champion (Barcelona)
+  WCD: PEDIGREE_STRONG, // Repeša, Jasmin — 2004 Final Four / final (Fortitudo Bologna)
+  BVH: PEDIGREE_STRONG, // Kazlauskas, Jonas — 1999 EuroLeague champion (Žalgiris)
+  CEV: PEDIGREE_STRONG, // Pianigiani, Simone — 2008 & 2011 Final Four (Montepaschi Siena)
+  WAV: PEDIGREE_STRONG, // Scariolo, Sergio — 2007 Final Four (Unicaja Málaga)
+  LAF: PEDIGREE_STRONG, // Perasović, Velimir — 2016 Final Four (Baskonia)
+  WBH: PEDIGREE_STRONG, // Vujošević, Duško — 2010 Final Four (Partizan)
+  WAI: PEDIGREE_STRONG, // Spahija, Neven — 2008 Final Four (Baskonia / Tau Cerámica)
+  AEY: PEDIGREE_STRONG, // Obradović, Saša — 2023 Final Four (Monaco)
+  TFT: PEDIGREE_STRONG, // Kattash, Oded — 2008 Final Four (Maccabi Tel Aviv)
+  BCR: PEDIGREE_STRONG, // Pashutin, Evgeny — 2010 Final Four (CSKA Moscow)
+  DAS: PEDIGREE_STRONG, // Mateo, Chus — 2023 EuroLeague champion + 2024 Final Four (Real Madrid)
+  CWX: PEDIGREE_STRONG, // Martínez, Pedro — 2025 Final Four (Valencia)
+  JZO: PEDIGREE_STRONG, // Boniciolli, Matteo — 2002 Final Four (Fortitudo Bologna)
+  WAB: PEDIGREE_STRONG, // Recalcati, Carlo — 2004 Final Four (Montepaschi Siena)
 };
 
 // Everyone else earns pedigree from TENURE — seasons on a EuroLeague bench is the one proxy for
@@ -124,6 +143,17 @@ export function pedigreeLabel(profile) {
   if (v >= PEDIGREE_ELITE) return "Elite";
   if (v >= PEDIGREE_STRONG) return "Proven";
   return null;
+}
+
+// Salary mode: a coach is a cheap hire, priced by pedigree — a journeyman is nearly free and always
+// available, and it climbs fast so a Legendary coach is a small splurge you save a little for. Kept
+// deliberately low: the captain is free (impact-only), so the coach is Salary's only budget line
+// beyond the players, and it's meant to be a light flavour choice, not a tax. Recalibrate in
+// sim/salary_sim.mjs if difficulty needs it.
+const COACH_PRICE = { Legendary: 15, Elite: 10, Proven: 5 };
+export const COACH_FLOOR_PRICE = 2; // a journeyman (untagged) coach — always affordable, also the draft reserve
+export function coachCost(profile) {
+  return COACH_PRICE[pedigreeLabel(profile)] || COACH_FLOOR_PRICE;
 }
 
 let PROFILES = null; // code -> { name, seasons:Set, tilt:{cat:number}, n, top, pedigree }
